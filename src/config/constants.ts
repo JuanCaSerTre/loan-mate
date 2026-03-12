@@ -67,6 +67,23 @@ export const NOTIFICATION_TYPES = {
   PAYMENT_REMINDER: "payment_reminder",
 } as const;
 
+// ─── Push Notification Events ────────────────────────────────────
+export const PUSH_NOTIFICATION_EVENTS = [
+  { type: "loan_request", label: "New loan request", emoji: "💸" },
+  { type: "loan_accepted", label: "Loan accepted", emoji: "✅" },
+  { type: "loan_declined", label: "Loan declined", emoji: "❌" },
+  { type: "payment_registered", label: "Payment registered", emoji: "💳" },
+  { type: "payment_confirmed", label: "Payment confirmed", emoji: "✅" },
+  { type: "payment_rejected", label: "Payment rejected", emoji: "❌" },
+  { type: "payment_reminder", label: "Upcoming payment reminder", emoji: "⏰" },
+] as const;
+
+// ─── Payment Reminder ────────────────────────────────────────────
+export const REMINDER = {
+  DAYS_BEFORE_DUE: 1,
+  CHECK_INTERVAL_MS: 60 * 60 * 1000, // 1 hour
+} as const;
+
 // ─── API ─────────────────────────────────────────────────────────
 export const API = {
   RETRY_ATTEMPTS: 3,

@@ -30,7 +30,7 @@ const config: AppConfig = {
     timeout: 15000,
   },
   features: {
-    pushNotifications: import.meta.env.VITE_ENABLE_PUSH === "true",
+    pushNotifications: import.meta.env.VITE_ENABLE_PUSH !== "false", // Enabled by default
     avatarUpload: true,
     interestRate: true,
   },

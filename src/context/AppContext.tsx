@@ -665,13 +665,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const getPendingPaymentConfirmations = useCallback(() => {
     if (!state.currentUser) return [];
+    // Return payments where the current user is part of the loan BUT did NOT register the payment
     return state.payments.filter(
       (p) =>
         p.status === "pending_confirmation" &&
+        p.created_by_user !== state.currentUser!.id &&
         state.loans.find(
           (l) =>
             l.loan_id === p.loan_id &&
-            l.borrower_id === state.currentUser!.id
+            (l.borrower_id === state.currentUser!.id || l.lender_id === state.currentUser!.id)
         )
     );
   }, [state.payments, state.loans, state.currentUser]);
@@ -684,10 +686,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const pendingPayments = state.payments.filter(
       (p) =>
         p.status === "pending_confirmation" &&
+        p.created_by_user !== state.currentUser!.id &&
         state.loans.find(
           (l) =>
             l.loan_id === p.loan_id &&
-            l.borrower_id === state.currentUser!.id
+            (l.borrower_id === state.currentUser!.id || l.lender_id === state.currentUser!.id)
         )
     ).length;
     return pendingLoans + pendingPayments;

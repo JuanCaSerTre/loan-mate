@@ -2,7 +2,7 @@ import { Loan } from "@/types/loan";
 import { useApp } from "@/context/AppContext";
 import AvatarBadge from "./AvatarBadge";
 import { motion } from "framer-motion";
-import { ChevronRight, Clock } from "lucide-react";
+import { ChevronRight, Clock, Check, AlertCircle } from "lucide-react";
 
 interface LoanCardProps {
   loan: Loan;
@@ -17,12 +17,17 @@ const statusColors = {
 };
 
 export default function LoanCard({ loan, index = 0 }: LoanCardProps) {
-  const { currentUser, getLoanComputed, navigate, selectLoan } = useApp();
+  const { currentUser, getLoanComputed, navigate, selectLoan, payments } = useApp();
   const isLender = loan.lender_id === currentUser?.id;
   const counterparty = isLender ? loan.borrower_name : loan.lender_name;
   const counterpartyAvatar = isLender ? loan.borrower_avatar : loan.lender_avatar;
 
-  const { confirmedPayments, remainingBalance, progress } = getLoanComputed(loan.loan_id);
+  const { confirmedPayments, confirmedAmount, remainingBalance, progress } = getLoanComputed(loan.loan_id);
+
+  // Check for pending payment confirmations on this loan
+  const pendingPayments = payments.filter(
+    (p) => p.loan_id === loan.loan_id && p.status === "pending_confirmation" && p.created_by_user !== currentUser?.id
+  );
 
   const statusStyle = statusColors[loan.status];
 
@@ -57,23 +62,37 @@ export default function LoanCard({ loan, index = 0 }: LoanCardProps) {
             </span>
             <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-semibold uppercase ${statusStyle.bg} ${statusStyle.text} ${statusStyle.border}`}>
               {loan.status === "pending" && <Clock className="w-2.5 h-2.5" />}
+              {loan.status === "completed" && <Check className="w-2.5 h-2.5" />}
               {loan.status}
             </div>
           </div>
 
-          <div className="flex items-center justify-between mt-1">
-            <span
-              className="text-white/40 text-xs"
-              style={{ fontFamily: "'Manrope', sans-serif" }}
-            >
-              {isLender ? "You lent" : "You owe"}
-            </span>
-            <span
-              className={`text-base font-black ${isLender ? "text-[#00C9A7]" : "text-[#FFB347]"}`}
-              style={{ fontFamily: "'Syne', sans-serif" }}
-            >
-              ${remainingBalance.toLocaleString("en-US", { minimumFractionDigits: 0 })}
-            </span>
+          {/* Financial row */}
+          <div className="flex items-center justify-between mt-1.5">
+            <div>
+              <span
+                className="text-white/40 text-[10px] block"
+                style={{ fontFamily: "'Manrope', sans-serif" }}
+              >
+                {isLender ? "You lent" : "You owe"}
+              </span>
+              <span
+                className={`text-base font-black ${isLender ? "text-[#00C9A7]" : "text-[#FFB347]"}`}
+                style={{ fontFamily: "'Syne', sans-serif" }}
+              >
+                ${remainingBalance.toLocaleString("en-US", { minimumFractionDigits: 0 })}
+              </span>
+            </div>
+            {loan.status !== "pending" && confirmedAmount > 0 && (
+              <div className="text-right">
+                <span className="text-white/25 text-[10px] block" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                  Paid
+                </span>
+                <span className="text-[#00C9A7]/60 text-xs font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                  ${confirmedAmount.toLocaleString("en-US", { minimumFractionDigits: 0 })}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Progress bar */}
@@ -88,9 +107,23 @@ export default function LoanCard({ loan, index = 0 }: LoanCardProps) {
                   initial={{ width: 0 }}
                   animate={{ width: `${progress}%` }}
                   transition={{ delay: 0.5 + index * 0.08, duration: 0.6, ease: "easeOut" }}
-                  className="h-full rounded-full bg-gradient-to-r from-[#00C9A7] to-[#00C9A7]/70"
+                  className={`h-full rounded-full ${
+                    progress === 100
+                      ? "bg-gradient-to-r from-[#00C9A7] to-[#00E5BD]"
+                      : "bg-gradient-to-r from-[#00C9A7] to-[#00C9A7]/70"
+                  }`}
                 />
               </div>
+            </div>
+          )}
+
+          {/* Pending confirmation badge */}
+          {pendingPayments.length > 0 && (
+            <div className="flex items-center gap-1.5 mt-2">
+              <AlertCircle className="w-3 h-3 text-[#FFB347]" />
+              <span className="text-[#FFB347] text-[10px] font-semibold" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                {pendingPayments.length} payment{pendingPayments.length > 1 ? "s" : ""} to confirm
+              </span>
             </div>
           )}
         </div>

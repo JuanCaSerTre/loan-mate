@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { AppProvider, useApp } from "@/context/AppContext";
+import { PushNotificationProvider } from "@/context/PushNotificationContext";
 import BottomNav from "@/components/shared/BottomNav";
 import SplashScreen from "@/components/screens/SplashScreen";
 import LoginScreen from "@/components/screens/LoginScreen";
@@ -61,8 +62,10 @@ function AppContent() {
 export default function LoanMateApp() {
   return (
     <AppProvider>
-      <AppContent />
-      <Toaster position="top-center" />
+      <PushNotificationProvider>
+        <AppContent />
+        <Toaster position="top-center" />
+      </PushNotificationProvider>
     </AppProvider>
   );
 }

@@ -12,3 +12,6 @@ export { loanService } from "./api/loanService";
 export { paymentService } from "./api/paymentService";
 export { notificationService } from "./api/notificationService";
 export { userService } from "./api/userService";
+
+export { pushNotificationService } from "./pushNotificationService";
+export { checkPaymentReminders } from "./paymentReminderService";
