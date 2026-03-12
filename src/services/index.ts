@@ -16,6 +16,14 @@ export { userService } from "./api/userService";
 export { pushNotificationService } from "./pushNotificationService";
 export { checkPaymentReminders } from "./paymentReminderService";
 
+export { securityService } from "./securityService";
+export type {
+  SecurityEvent,
+  SecurityEventType,
+  SecurityValidationResult,
+  AuthToken,
+} from "./securityService";
+
 // Invitation & contact services
 export {
   generateReferralCode,

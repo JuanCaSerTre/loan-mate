@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Search, Check, BookUser, ChevronRight, Users, CalendarDays, TrendingUp, Wallet, Clock } from "lucide-react";
+import { X, Search, Check, BookUser, ChevronRight, Users, CalendarDays, TrendingUp, Wallet, Clock, ShieldAlert, ShieldCheck, AlertTriangle } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { PaymentFrequency } from "@/types/loan";
 import AvatarBadge from "@/components/shared/AvatarBadge";
@@ -12,7 +12,7 @@ import { toast } from "sonner";
 type Step = 1 | 2 | 3;
 
 export default function CreateLoanScreen() {
-  const { navigate, currentUser, findUserByPhone, createLoan, users } = useApp();
+  const { navigate, currentUser, findUserByPhone, createLoan, users, validateLoanCreation } = useApp();
   const [step, setStep] = useState<Step>(1);
   const [borrowerPhone, setBorrowerPhone] = useState("");
   const [foundUser, setFoundUser] = useState<ReturnType<typeof findUserByPhone>>(undefined);
@@ -24,6 +24,8 @@ export default function CreateLoanScreen() {
   const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
   const [showContactPicker, setShowContactPicker] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
+  const [securityError, setSecurityError] = useState<string | null>(null);
+  const [securityWarnings, setSecurityWarnings] = useState<string[]>([]);
 
   // Contact syncing for the inline contact picker
   const {
@@ -112,7 +114,26 @@ export default function CreateLoanScreen() {
       return;
     }
 
-    createLoan({
+    // Run security validation
+    const validation = validateLoanCreation({
+      borrower: foundUser,
+      amount: parsedAmount,
+      interestRate: parsedRate,
+      numberOfPayments: parsedPayments,
+    });
+
+    if (!validation.allowed) {
+      setSecurityError(validation.reason || "Loan creation blocked by security policy.");
+      toast.error("Loan blocked", { description: validation.reason });
+      return;
+    }
+
+    // Show warnings but proceed
+    if (validation.warnings.length > 0) {
+      setSecurityWarnings(validation.warnings);
+    }
+
+    const loanId = createLoan({
       borrower: foundUser,
       amount: parsedAmount,
       interestRate: parsedRate,
@@ -121,6 +142,12 @@ export default function CreateLoanScreen() {
       startDate: startDate,
       dueDate: dueDate,
     });
+
+    if (!loanId) {
+      setSecurityError("Loan creation was blocked. Please check the details and try again.");
+      toast.error("Loan creation failed");
+      return;
+    }
 
     toast.success("Loan request sent!", {
       description: `$${parsedAmount.toLocaleString()} to ${foundUser.name}`,
@@ -547,7 +574,24 @@ export default function CreateLoanScreen() {
                   Back
                 </button>
                 <button
-                  onClick={() => amount && setStep(3)}
+                  onClick={() => {
+                    if (amount && foundUser) {
+                      // Pre-validate before moving to review
+                      const preCheck = validateLoanCreation({
+                        borrower: foundUser,
+                        amount: parsedAmount,
+                        interestRate: parsedRate,
+                        numberOfPayments: parsedPayments,
+                      });
+                      setSecurityWarnings(preCheck.warnings);
+                      if (!preCheck.allowed) {
+                        setSecurityError(preCheck.reason || "Blocked");
+                      } else {
+                        setSecurityError(null);
+                      }
+                      setStep(3);
+                    }
+                  }}
                   disabled={!amount}
                   className="flex-1 h-14 rounded-2xl bg-[#1B2E4B] text-white font-semibold text-base disabled:opacity-30"
                 >
@@ -691,16 +735,69 @@ export default function CreateLoanScreen() {
                 </AnimatePresence>
               </div>
 
+              {/* Security Warnings */}
+              <AnimatePresence>
+                {securityWarnings.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 8 }}
+                    className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                      <p className="text-amber-800 text-xs font-semibold uppercase tracking-wider">Security Warnings</p>
+                    </div>
+                    {securityWarnings.map((w, i) => (
+                      <p key={i} className="text-amber-700 text-xs pl-6">• {w}</p>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Security Error */}
+              <AnimatePresence>
+                {securityError && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 8 }}
+                    className="bg-red-50 border border-red-200 rounded-2xl p-4"
+                  >
+                    <div className="flex items-start gap-2">
+                      <ShieldAlert className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-red-800 text-xs font-semibold mb-1">Blocked by Security</p>
+                        <p className="text-red-600 text-xs">{securityError}</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Security Badge */}
+              {!securityError && (
+                <div className="flex items-center justify-center gap-1.5 py-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                  <span className="text-emerald-600 text-[10px] font-semibold">Protected by LoanMate Security</span>
+                </div>
+              )}
+
               <div className="flex gap-3">
                 <button
-                  onClick={() => setStep(2)}
+                  onClick={() => {
+                    setStep(2);
+                    setSecurityError(null);
+                    setSecurityWarnings([]);
+                  }}
                   className="flex-1 h-14 rounded-2xl bg-white border border-gray-200 text-gray-700 font-semibold text-base"
                 >
                   Edit
                 </button>
                 <button
                   onClick={handleSubmit}
-                  className="flex-1 h-14 rounded-2xl bg-[#1B2E4B] text-white font-semibold text-base active:scale-[0.98] transition-transform shadow-lg shadow-[#1B2E4B]/20"
+                  disabled={!!securityError}
+                  className="flex-1 h-14 rounded-2xl bg-[#1B2E4B] text-white font-semibold text-base active:scale-[0.98] transition-transform shadow-lg shadow-[#1B2E4B]/20 disabled:opacity-30"
                 >
                   Send Request
                 </button>

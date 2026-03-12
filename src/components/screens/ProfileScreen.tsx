@@ -1,19 +1,22 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { LogOut, ChevronRight, Shield, HelpCircle, BellOff, BellRing, Loader2, Share2, Copy, Link2, Clock, CalendarDays, AlertTriangle } from "lucide-react";
+import { LogOut, ChevronRight, Shield, HelpCircle, BellOff, BellRing, Loader2, Share2, Copy, Link2, Clock, CalendarDays, AlertTriangle, ShieldCheck, ShieldAlert, Activity } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { usePushContext } from "@/context/PushNotificationContext";
 import { useInvitations } from "@/hooks/useInvitations";
 import AvatarBadge from "@/components/shared/AvatarBadge";
 import InviteMetricsCard from "@/components/shared/InviteMetricsCard";
 import { toast } from "sonner";
+import { useState } from "react";
+import { securityService } from "@/services/securityService";
 
 export default function ProfileScreen() {
-  const { currentUser, loans, logout } = useApp();
+  const { currentUser, loans, logout, getSecurityLog } = useApp();
   const { isEnabled, permissionStatus, isSupported, isLoading, enablePush, disablePush, reminderPreferences, updateReminderPreferences } = usePushContext();
   const { metrics, copyLink, personalReferralCode, invitations } = useInvitations(
     currentUser?.id || "",
     currentUser?.name || ""
   );
+  const [showSecurityLog, setShowSecurityLog] = useState(false);
 
   if (!currentUser) return null;
 
@@ -431,6 +434,90 @@ export default function ProfileScreen() {
               </div>
             );
           })}
+        </motion.div>
+
+        {/* Security Activity Log */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.22 }}
+          className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden"
+        >
+          <button
+            onClick={() => setShowSecurityLog(!showSecurityLog)}
+            className="w-full flex items-center gap-3 px-4 py-4"
+          >
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-gray-900 text-sm font-semibold">Security Activity</p>
+              <p className="text-gray-400 text-[11px]">View recent security events</p>
+            </div>
+            <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${showSecurityLog ? "rotate-90" : ""}`} />
+          </button>
+
+          <AnimatePresence>
+            {showSecurityLog && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                className="overflow-hidden"
+              >
+                <div className="border-t border-gray-100 px-4 py-3 max-h-64 overflow-y-auto space-y-2">
+                  {(() => {
+                    const events = securityService.getActivityLog(15);
+                    if (events.length === 0) {
+                      return (
+                        <div className="flex flex-col items-center py-4">
+                          <Activity className="w-5 h-5 text-gray-300 mb-2" />
+                          <p className="text-gray-400 text-xs">No security events yet</p>
+                        </div>
+                      );
+                    }
+                    return events.map((event) => (
+                      <div
+                        key={event.id}
+                        className={`flex items-start gap-2.5 p-2.5 rounded-xl text-xs ${
+                          event.severity === "critical"
+                            ? "bg-red-50 border border-red-100"
+                            : event.severity === "warning"
+                            ? "bg-amber-50 border border-amber-100"
+                            : "bg-gray-50 border border-gray-100"
+                        }`}
+                      >
+                        <div className="mt-0.5">
+                          {event.severity === "critical" ? (
+                            <ShieldAlert className="w-3.5 h-3.5 text-red-500" />
+                          ) : event.severity === "warning" ? (
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                          ) : (
+                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`font-semibold truncate ${
+                            event.severity === "critical" ? "text-red-700" :
+                            event.severity === "warning" ? "text-amber-700" : "text-gray-700"
+                          }`}>
+                            {event.type.replace(/_/g, " ")}
+                          </p>
+                          <p className="text-gray-500 line-clamp-2">{event.message}</p>
+                          <p className="text-gray-400 mt-0.5">
+                            {new Date(event.timestamp).toLocaleString("en-US", {
+                              month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
 
         {/* Logout */}

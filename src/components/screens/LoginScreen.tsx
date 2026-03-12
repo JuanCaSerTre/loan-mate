@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ShieldAlert } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { mockUsers } from "@/data/mockData";
+import { securityService } from "@/services/securityService";
 
 const COUNTRY_CODES = [
   { code: "+1", flag: "🇺🇸", name: "US" },
@@ -71,9 +72,21 @@ export default function LoginScreen() {
   };
 
   const verifyOtp = (code: string) => {
+    const fullPhone = countryCode.code + phone;
+
+    // Check OTP lockout
+    const otpCheck = securityService.checkOTPAttempt(fullPhone);
+    if (!otpCheck.allowed) {
+      setError(`Too many failed attempts. Try again in ${otpCheck.lockoutUntil}`);
+      setOtp(["", "", "", "", "", ""]);
+      return;
+    }
+
     if (code === VALID_OTP) {
+      // Clear OTP attempts on success
+      securityService.clearOTPAttempts(fullPhone);
+
       // Check if returning or new user
-      const fullPhone = countryCode.code + " " + phone;
       const existingUser = mockUsers.find(
         (u) => u.phone_number.replace(/\D/g, "").includes(phone.replace(/\D/g, ""))
       );
@@ -83,8 +96,17 @@ export default function LoginScreen() {
         navigate("onboarding");
       }
     } else {
+      // Record failed attempt
+      securityService.recordFailedOTP(fullPhone);
+
+      const updatedCheck = securityService.checkOTPAttempt(fullPhone);
+
       setIsShaking(true);
-      setError("Invalid verification code. Try 123456");
+      if (!updatedCheck.allowed) {
+        setError(`Account locked. Try again in ${updatedCheck.lockoutUntil}`);
+      } else {
+        setError(`Invalid verification code. ${updatedCheck.remainingAttempts} attempt${updatedCheck.remainingAttempts !== 1 ? "s" : ""} remaining.`);
+      }
       setOtp(["", "", "", "", "", ""]);
       setTimeout(() => {
         setIsShaking(false);

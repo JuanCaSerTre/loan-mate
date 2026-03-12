@@ -85,6 +85,30 @@ export const REMINDER = {
   CHECK_INTERVAL_MS: 60 * 60 * 1000, // 1 hour
 } as const;
 
+// ─── Security ─────────────────────────────────────────────────────
+export const SECURITY = {
+  /** Max loans a user can create per day */
+  MAX_LOANS_PER_DAY: 10,
+  /** Max payments a user can register per day */
+  MAX_PAYMENTS_PER_DAY: 20,
+  /** Minimum minutes between duplicate loan requests (same lender + borrower + amount) */
+  DUPLICATE_LOAN_COOLDOWN_MINUTES: 30,
+  /** Max failed OTP attempts before lockout */
+  MAX_OTP_ATTEMPTS: 5,
+  /** OTP lockout duration in minutes */
+  OTP_LOCKOUT_MINUTES: 15,
+  /** Session token expiry in milliseconds (1 hour) */
+  SESSION_TOKEN_EXPIRY_MS: 60 * 60 * 1000,
+  /** Token refresh buffer — refresh if less than this many ms remain */
+  TOKEN_REFRESH_BUFFER_MS: 5 * 60 * 1000,
+  /** Max interest rate considered reasonable (%) */
+  MAX_REASONABLE_INTEREST_RATE: 50,
+  /** Min loan amount that triggers a high-value warning */
+  SUSPICIOUS_HIGH_AMOUNT: 50_000,
+  /** Max number of active loans between the same two users */
+  MAX_ACTIVE_LOANS_BETWEEN_USERS: 5,
+} as const;
+
 // ─── API ─────────────────────────────────────────────────────────
 export const API = {
   RETRY_ATTEMPTS: 3,

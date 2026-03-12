@@ -1,6 +1,6 @@
 /**
  * LoanMate — API Client
- * Centralized HTTP/Supabase client with error handling, retries, and typing.
+ * Centralized HTTP/Supabase client with error handling, retries, typing, and auth token management.
  * When Supabase is connected, this becomes the single point of contact.
  * For now, it wraps mock data with the same interface the real API will use.
  */
@@ -26,12 +26,15 @@ interface RequestOptions {
   body?: unknown;
   headers?: Record<string, string>;
   timeout?: number;
+  /** Skip auth token header for public endpoints */
+  skipAuth?: boolean;
 }
 
 // ─── API Client Class ────────────────────────────────────────────
 class ApiClient {
   private baseUrl: string;
   private defaultHeaders: Record<string, string>;
+  private tokenProvider: (() => string | null) | null = null;
 
   constructor(baseUrl: string = "") {
     this.baseUrl = baseUrl;
@@ -40,19 +43,53 @@ class ApiClient {
     };
   }
 
+  /**
+   * Set a static auth token.
+   */
   setAuthToken(token: string) {
     this.defaultHeaders["Authorization"] = `Bearer ${token}`;
   }
 
+  /**
+   * Register a dynamic token provider (used by securityService).
+   * This function is called on every request to get the latest token.
+   */
+  setTokenProvider(provider: () => string | null) {
+    this.tokenProvider = provider;
+  }
+
   clearAuthToken() {
     delete this.defaultHeaders["Authorization"];
+    this.tokenProvider = null;
+  }
+
+  /**
+   * Build request headers, injecting the auth token if available.
+   */
+  private _buildHeaders(extraHeaders: Record<string, string> = {}, skipAuth = false): Record<string, string> {
+    const headers = { ...this.defaultHeaders, ...extraHeaders };
+
+    if (!skipAuth && !headers["Authorization"] && this.tokenProvider) {
+      const token = this.tokenProvider();
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+    }
+
+    return headers;
   }
 
   private async request<T>(
     endpoint: string,
     options: RequestOptions = {}
   ): Promise<ApiResponse<T>> {
-    const { method = "GET", body, headers = {}, timeout = API.REQUEST_TIMEOUT_MS } = options;
+    const {
+      method = "GET",
+      body,
+      headers = {},
+      timeout = API.REQUEST_TIMEOUT_MS,
+      skipAuth = false,
+    } = options;
     const url = `${this.baseUrl}${endpoint}`;
 
     const controller = new AbortController();
@@ -61,12 +98,36 @@ class ApiClient {
     try {
       const response = await fetch(url, {
         method,
-        headers: { ...this.defaultHeaders, ...headers },
+        headers: this._buildHeaders(headers, skipAuth),
         body: body ? JSON.stringify(body) : undefined,
         signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
+
+      // Handle 401 Unauthorized
+      if (response.status === 401) {
+        return {
+          data: null,
+          error: {
+            code: "UNAUTHORIZED",
+            message: "Authentication required. Please log in again.",
+          },
+          status: 401,
+        };
+      }
+
+      // Handle 429 Too Many Requests (server-side rate limiting)
+      if (response.status === 429) {
+        return {
+          data: null,
+          error: {
+            code: "RATE_LIMITED",
+            message: "Too many requests. Please try again later.",
+          },
+          status: 429,
+        };
+      }
 
       const data = response.ok ? await response.json() : null;
       const error = !response.ok

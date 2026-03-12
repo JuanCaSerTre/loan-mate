@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, AlertCircle, Send } from "lucide-react";
+import { ArrowLeft, AlertCircle, Send, ShieldAlert } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import AvatarBadge from "@/components/shared/AvatarBadge";
 import { toast } from "sonner";
 
 export default function RegisterPaymentScreen() {
-  const { selectedLoanId, getLoanById, getLoanComputed, navigate, currentUser, registerPayment } = useApp();
+  const { selectedLoanId, getLoanById, getLoanComputed, navigate, currentUser, registerPayment, validatePaymentRegistration } = useApp();
   const loan = selectedLoanId ? getLoanById(selectedLoanId) : null;
   const computed = selectedLoanId ? getLoanComputed(selectedLoanId) : null;
 
@@ -20,6 +20,7 @@ export default function RegisterPaymentScreen() {
   const [note, setNote] = useState("");
   const [amountError, setAmountError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [securityError, setSecurityError] = useState<string | null>(null);
 
   if (!loan) return null;
 
@@ -47,14 +48,34 @@ export default function RegisterPaymentScreen() {
   const handleSubmit = () => {
     if (!validateAmount(amount)) return;
 
+    // Security validation
+    const validation = validatePaymentRegistration({
+      loanId: loan.loan_id,
+      amount: parsedAmount,
+    });
+
+    if (!validation.allowed) {
+      setSecurityError(validation.reason || "Payment blocked by security policy.");
+      toast.error("Payment blocked", { description: validation.reason });
+      return;
+    }
+
+    setSecurityError(null);
     setIsSubmitting(true);
     setTimeout(() => {
-      registerPayment({
+      const result = registerPayment({
         loanId: loan.loan_id,
         amount: parsedAmount,
         paymentDate: date,
         note: note || undefined,
       });
+
+      if (result && !result.allowed) {
+        setIsSubmitting(false);
+        setSecurityError(result.reason || "Payment blocked.");
+        toast.error("Payment blocked", { description: result.reason });
+        return;
+      }
 
       toast.success("Payment submitted!", {
         description: `$${parsedAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })} sent to ${counterparty} for confirmation`,
@@ -244,6 +265,15 @@ export default function RegisterPaymentScreen() {
         transition={{ delay: 0.3 }}
         className="px-5 pb-6 space-y-2 bg-white pt-4 border-t border-gray-100"
       >
+        {/* Security Error */}
+        {securityError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-2">
+            <div className="flex items-start gap-2">
+              <ShieldAlert className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+              <p className="text-red-600 text-xs">{securityError}</p>
+            </div>
+          </div>
+        )}
         <p className="text-gray-400 text-[10px] text-center">
           {counterparty} will need to confirm this payment
         </p>

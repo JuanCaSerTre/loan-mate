@@ -9,6 +9,9 @@ import {
 import {
   calculateTotalAmount,
 } from "@/lib/calculations";
+import { securityService } from "@/services/securityService";
+import { apiClient } from "@/services/api/client";
+import type { SecurityValidationResult } from "@/services/securityService";
 
 type AppScreen =
   | "splash"
@@ -59,7 +62,7 @@ interface AppContextType extends AppState {
     paymentFrequency: Loan["payment_frequency"];
     startDate: string;
     dueDate: string;
-  }) => string;
+  }) => string | null;
   acceptLoan: (loanId: string) => void;
   declineLoan: (loanId: string) => void;
   registerPayment: (params: {
@@ -67,7 +70,7 @@ interface AppContextType extends AppState {
     amount: number;
     paymentDate: string;
     note?: string;
-  }) => void;
+  }) => SecurityValidationResult | null;
   confirmPayment: (paymentId: string) => void;
   rejectPayment: (paymentId: string) => void;
   addLoan: (loan: Loan) => void;
@@ -88,6 +91,20 @@ interface AppContextType extends AppState {
   getPendingActions: () => number;
   getPendingLoanRequests: () => Loan[];
   getPendingPaymentConfirmations: () => Payment[];
+  /** Security: Validate a loan before creation without side effects. */
+  validateLoanCreation: (params: {
+    borrower: User;
+    amount: number;
+    interestRate: number;
+    numberOfPayments: number;
+  }) => SecurityValidationResult;
+  /** Security: Validate a payment before registration without side effects. */
+  validatePaymentRegistration: (params: {
+    loanId: string;
+    amount: number;
+  }) => SecurityValidationResult;
+  /** Security: Get recent security activity log. */
+  getSecurityLog: () => ReturnType<typeof securityService.getActivityLog>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -110,6 +127,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback((user: User) => {
+    // Issue auth token and configure API client
+    const token = securityService.generateToken(user.id);
+    apiClient.setTokenProvider(() => securityService.getTokenString());
+    apiClient.setAuthToken(token.token);
+
     setState((prev) => ({
       ...prev,
       currentUser: user,
@@ -119,6 +141,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    // Clear auth token and API client auth
+    securityService.clearToken();
+    apiClient.clearAuthToken();
+
     setState((prev) => ({
       ...prev,
       currentUser: null,
@@ -167,7 +193,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
-  // ─── Loan Creation Flow ────────────────────────────────────────
+  // ─── Loan Creation Flow (with security) ─────────────────────────
   const createLoan = useCallback(
     (params: {
       borrower: User;
@@ -177,9 +203,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       paymentFrequency: Loan["payment_frequency"];
       startDate: string;
       dueDate: string;
-    }) => {
+    }): string | null => {
+      // We need to read current state synchronously for validation
+      let currentState: AppState | null = null;
+      setState((prev) => {
+        currentState = prev;
+        return prev; // don't modify
+      });
+
+      if (!currentState) return null;
+      const cs = currentState as AppState;
+      if (!cs.currentUser) return null;
+
+      // Run comprehensive security validation
+      const validation = securityService.validateLoanInput({
+        userId: cs.currentUser.id,
+        borrowerId: params.borrower.id,
+        amount: params.amount,
+        interestRate: params.interestRate,
+        numberOfPayments: params.numberOfPayments,
+        existingLoans: cs.loans,
+      });
+
+      if (!validation.allowed) {
+        // Return null to signal blocked — caller should check validateLoanCreation() first
+        return null;
+      }
+
+      // Sanitize note-like fields
+      const sanitizedAmount = securityService.sanitizeAmount(params.amount.toString());
+
       const loanId = `loan_${Date.now()}`;
-      const totalAmount = calculateTotalAmount(params.amount, params.interestRate);
+      const totalAmount = calculateTotalAmount(sanitizedAmount, params.interestRate);
 
       setState((prev) => {
         if (!prev.currentUser) return prev;
@@ -193,7 +248,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           borrower_name: params.borrower.name,
           lender_avatar: prev.currentUser.avatar,
           borrower_avatar: params.borrower.avatar,
-          loan_amount: params.amount,
+          loan_amount: sanitizedAmount,
           interest_rate: params.interestRate,
           total_amount: totalAmount,
           number_of_payments: params.numberOfPayments,
@@ -209,7 +264,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           id: `notif_${Date.now()}_lender`,
           type: "loan_request",
           title: "Loan Request Sent",
-          message: `You sent a loan request to ${params.borrower.name} for $${params.amount.toLocaleString()}`,
+          message: `You sent a loan request to ${params.borrower.name} for $${sanitizedAmount.toLocaleString()}`,
           loan_id: loanId,
           read: false,
           created_at: new Date().toISOString(),
@@ -220,11 +275,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           id: `notif_${Date.now()}_borrower`,
           type: "loan_request",
           title: "New Loan Request",
-          message: `${prev.currentUser.name} wants to lend you $${params.amount.toLocaleString()}`,
+          message: `${prev.currentUser.name} wants to lend you $${sanitizedAmount.toLocaleString()}`,
           loan_id: loanId,
           read: false,
           created_at: new Date().toISOString(),
         };
+
+        // Log successful creation
+        securityService.logEvent({
+          type: "loan_created",
+          userId: prev.currentUser.id,
+          message: `Loan created: $${sanitizedAmount.toLocaleString()} to ${params.borrower.name}`,
+          severity: "info",
+          metadata: {
+            loanId,
+            amount: sanitizedAmount,
+            borrowerId: params.borrower.id,
+            interestRate: params.interestRate,
+          },
+        });
 
         return {
           ...prev,
@@ -316,14 +385,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // ─── Payment Registration ──────────────────────────────────────
+  // ─── Payment Registration (with security) ───────────────────────
   const registerPayment = useCallback(
     (params: {
       loanId: string;
       amount: number;
       paymentDate: string;
       note?: string;
-    }) => {
+    }): SecurityValidationResult | null => {
+      let result: SecurityValidationResult | null = null;
+
       setState((prev) => {
         if (!prev.currentUser) return prev;
         const loan = prev.loans.find((l) => l.loan_id === params.loanId);
@@ -334,7 +405,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           .filter((p) => p.loan_id === params.loanId && p.status === "confirmed")
           .reduce((s, p) => s + p.amount, 0);
         const remaining = loan.total_amount - confirmedAmount;
-        const clampedAmount = Math.min(params.amount, remaining);
+
+        // Security validation
+        const validation = securityService.validatePaymentInput({
+          userId: prev.currentUser.id,
+          amount: params.amount,
+          remainingBalance: remaining,
+          existingPayments: prev.payments,
+        });
+
+        if (!validation.allowed) {
+          result = validation;
+          return prev; // Block the payment
+        }
+
+        result = validation;
+
+        const clampedAmount = Math.min(
+          securityService.sanitizeAmount(params.amount.toString()),
+          remaining
+        );
+
+        // Sanitize note
+        const sanitizedNote = params.note
+          ? securityService.sanitizeTextInput(params.note)
+          : undefined;
 
         const newPayment: Payment = {
           payment_id: `pay_${Date.now()}`,
@@ -342,7 +437,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           amount: clampedAmount,
           created_by_user: prev.currentUser.id,
           status: "pending_confirmation",
-          note: params.note || undefined,
+          note: sanitizedNote,
           created_at: new Date().toISOString(),
           payment_date: params.paymentDate,
         };
@@ -372,12 +467,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           created_at: new Date().toISOString(),
         };
 
+        // Log successful payment
+        securityService.logEvent({
+          type: "payment_registered",
+          userId: prev.currentUser.id,
+          message: `Payment registered: $${clampedAmount.toLocaleString()} for loan ${params.loanId}`,
+          severity: "info",
+          metadata: { paymentId: newPayment.payment_id, amount: clampedAmount, loanId: params.loanId },
+        });
+
         return {
           ...prev,
           payments: [...prev.payments, newPayment],
           notifications: [receiverNotif, senderNotif, ...prev.notifications],
         };
       });
+
+      return result;
     },
     []
   );
@@ -697,6 +803,60 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return pendingLoans + pendingPayments;
   }, [state.loans, state.payments, state.currentUser]);
 
+  // ─── Security Validation (read-only checks) ────────────────────
+  const validateLoanCreation = useCallback(
+    (params: {
+      borrower: User;
+      amount: number;
+      interestRate: number;
+      numberOfPayments: number;
+    }): SecurityValidationResult => {
+      if (!state.currentUser) {
+        return { allowed: false, reason: "You must be logged in.", warnings: [] };
+      }
+
+      return securityService.validateLoanInput({
+        userId: state.currentUser.id,
+        borrowerId: params.borrower.id,
+        amount: params.amount,
+        interestRate: params.interestRate,
+        numberOfPayments: params.numberOfPayments,
+        existingLoans: state.loans,
+      });
+    },
+    [state.currentUser, state.loans]
+  );
+
+  const validatePaymentRegistration = useCallback(
+    (params: { loanId: string; amount: number }): SecurityValidationResult => {
+      if (!state.currentUser) {
+        return { allowed: false, reason: "You must be logged in.", warnings: [] };
+      }
+
+      const loan = state.loans.find((l) => l.loan_id === params.loanId);
+      if (!loan) {
+        return { allowed: false, reason: "Loan not found.", warnings: [] };
+      }
+
+      const confirmedAmount = state.payments
+        .filter((p) => p.loan_id === params.loanId && p.status === "confirmed")
+        .reduce((s, p) => s + p.amount, 0);
+      const remaining = loan.total_amount - confirmedAmount;
+
+      return securityService.validatePaymentInput({
+        userId: state.currentUser.id,
+        amount: params.amount,
+        remainingBalance: remaining,
+        existingPayments: state.payments,
+      });
+    },
+    [state.currentUser, state.loans, state.payments]
+  );
+
+  const getSecurityLog = useCallback(() => {
+    return securityService.getActivityLog();
+  }, []);
+
   return (
     <AppContext.Provider
       value={{
@@ -730,6 +890,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         getPendingActions,
         getPendingLoanRequests,
         getPendingPaymentConfirmations,
+        validateLoanCreation,
+        validatePaymentRegistration,
+        getSecurityLog,
       }}
     >
       {children}

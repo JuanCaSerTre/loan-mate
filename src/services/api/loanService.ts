@@ -1,12 +1,13 @@
 /**
  * LoanMate — Loan Service
- * CRUD operations for loans.
+ * CRUD operations for loans with security validation.
  * Currently uses mock data; swap to Supabase queries when connected.
  */
 import { Loan, LoanStatus } from "@/types/loan";
 import { mockLoans } from "@/data/mockData";
 import type { ApiResponse } from "./client";
 import type { CreateLoanModel } from "@/models/schemas";
+import { securityService } from "@/services/securityService";
 
 class LoanService {
   /**
@@ -15,6 +16,18 @@ class LoanService {
    */
   async getUserLoans(userId: string): Promise<ApiResponse<Loan[]>> {
     await this._delay(500);
+
+    // Validate auth token
+    const { valid } = securityService.validateToken();
+    if (!valid) {
+      securityService.logEvent({
+        type: "auth_token_expired",
+        userId,
+        message: "Unauthenticated loan fetch attempt",
+        severity: "warning",
+      });
+      // Still return data for MVP mock, but log the attempt
+    }
 
     const loans = mockLoans.filter(
       (l) => l.lender_id === userId || l.borrower_id === userId
@@ -43,6 +56,7 @@ class LoanService {
 
   /**
    * Create a new loan request.
+   * Includes server-side-like validation for amount and interest rate.
    * TODO: Replace with Supabase insert
    */
   async createLoan(
@@ -56,7 +70,34 @@ class LoanService {
   ): Promise<ApiResponse<Loan>> {
     await this._delay(800);
 
+    // Server-side validation: amount must be positive
+    if (input.loan_amount <= 0) {
+      return {
+        data: null,
+        error: { code: "VALIDATION_ERROR", message: "Loan amount must be positive" },
+        status: 400,
+      };
+    }
+
+    // Server-side validation: interest rate bounds
     const interestRate = input.interest_rate || 0;
+    if (interestRate < 0 || interestRate > 100) {
+      return {
+        data: null,
+        error: { code: "VALIDATION_ERROR", message: "Interest rate must be between 0% and 100%" },
+        status: 400,
+      };
+    }
+
+    // Server-side validation: prevent self-loan
+    if (lenderId === borrowerId) {
+      return {
+        data: null,
+        error: { code: "VALIDATION_ERROR", message: "Cannot create a loan with yourself" },
+        status: 400,
+      };
+    }
+
     const totalAmount = input.loan_amount * (1 + interestRate / 100);
 
     const newLoan: Loan = {
