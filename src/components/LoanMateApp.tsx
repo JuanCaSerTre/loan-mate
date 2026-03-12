@@ -5,6 +5,7 @@ import BottomNav from "@/components/shared/BottomNav";
 import SplashScreen from "@/components/screens/SplashScreen";
 import LoginScreen from "@/components/screens/LoginScreen";
 import OnboardingScreen from "@/components/screens/OnboardingScreen";
+import TermsScreen from "@/components/screens/TermsScreen";
 import DashboardScreen from "@/components/screens/DashboardScreen";
 import LoansScreen from "@/components/screens/LoansScreen";
 import CreateLoanScreen from "@/components/screens/CreateLoanScreen";
@@ -27,6 +28,7 @@ function AppContent() {
       case "splash": return <SplashScreen />;
       case "login": return <LoginScreen />;
       case "onboarding": return <OnboardingScreen />;
+      case "terms": return <TermsScreen />;
       case "dashboard": return <DashboardScreen />;
       case "loans": return <LoansScreen />;
       case "create-loan": return <CreateLoanScreen />;

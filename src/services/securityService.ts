@@ -21,6 +21,7 @@ export type SecurityEventType =
   | "loan_created"
   | "payment_registered"
   | "login_success"
+  | "terms_accepted"
   | "logout";
 
 export interface SecurityEvent {

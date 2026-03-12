@@ -12,11 +12,23 @@ import {
 import { securityService } from "@/services/securityService";
 import { apiClient } from "@/services/api/client";
 import type { SecurityValidationResult } from "@/services/securityService";
+import {
+  identifyUser,
+  clearUser,
+  trackDailyActiveUser,
+  trackLoanCreated,
+  trackLoanAccepted,
+  trackLoanRejected,
+  trackPaymentRegistered,
+  trackPaymentConfirmed,
+  trackLoanCompleted,
+} from "@/services/analyticsService";
 
 type AppScreen =
   | "splash"
   | "login"
   | "onboarding"
+  | "terms"
   | "dashboard"
   | "loans"
   | "create-loan"
@@ -37,6 +49,8 @@ interface AppState {
   users: User[];
   selectedLoanId: string | null;
   selectedPaymentId: string | null;
+  /** ISO timestamp of when the user last accepted terms; null if not yet accepted. */
+  termsAcceptedAt: string | null;
 }
 
 interface LoanComputedData {
@@ -52,6 +66,8 @@ interface AppContextType extends AppState {
   navigate: (screen: AppScreen) => void;
   login: (user: User) => void;
   logout: () => void;
+  /** Accept terms & privacy policy — records timestamp and navigates to dashboard. */
+  acceptTerms: () => void;
   selectLoan: (loanId: string) => void;
   selectPayment: (paymentId: string) => void;
   createLoan: (params: {
@@ -120,6 +136,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     users: mockUsers,
     selectedLoanId: null,
     selectedPaymentId: null,
+    termsAcceptedAt: localStorage.getItem("loanmate_terms_accepted_at") ?? null,
   });
 
   const navigate = useCallback((screen: AppScreen) => {
@@ -132,18 +149,50 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     apiClient.setTokenProvider(() => securityService.getTokenString());
     apiClient.setAuthToken(token.token);
 
+    // Analytics: identify the user and record daily active user
+    identifyUser(user.id, { name: user.name });
+    trackDailyActiveUser(user.id);
+
+    // Determine whether the user still needs to see the terms screen
+    const storedAcceptance = localStorage.getItem("loanmate_terms_accepted_at");
+
     setState((prev) => ({
       ...prev,
       currentUser: user,
       isAuthenticated: true,
-      currentScreen: "dashboard",
+      termsAcceptedAt: storedAcceptance,
+      currentScreen: storedAcceptance ? "dashboard" : "terms",
     }));
+  }, []);
+
+  const acceptTerms = useCallback(() => {
+    const timestamp = new Date().toISOString();
+    // Persist acceptance so it survives page refresh
+    localStorage.setItem("loanmate_terms_accepted_at", timestamp);
+
+    setState((prev) => {
+      securityService.logEvent({
+        type: "terms_accepted",
+        userId: prev.currentUser?.id ?? "unknown",
+        message: `User accepted Terms of Service and Privacy Policy at ${timestamp}`,
+        severity: "info",
+        metadata: { timestamp },
+      });
+      return {
+        ...prev,
+        termsAcceptedAt: timestamp,
+        currentScreen: "dashboard",
+      };
+    });
   }, []);
 
   const logout = useCallback(() => {
     // Clear auth token and API client auth
     securityService.clearToken();
     apiClient.clearAuthToken();
+
+    // Analytics: clear identity
+    clearUser();
 
     setState((prev) => ({
       ...prev,
@@ -295,6 +344,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           },
         });
 
+        // Analytics
+        trackLoanCreated({
+          loanId,
+          amount: sanitizedAmount,
+          interestRate: params.interestRate,
+          numberOfPayments: params.numberOfPayments,
+          paymentFrequency: params.paymentFrequency,
+        });
+
         return {
           ...prev,
           loans: [...prev.loans, newLoan],
@@ -310,9 +368,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Loan Accept/Decline ───────────────────────────────────────
   const acceptLoan = useCallback((loanId: string) => {
+    let loanSnapshot: Loan | undefined;
     setState((prev) => {
       const loan = prev.loans.find((l) => l.loan_id === loanId);
       if (!loan || loan.status !== "pending") return prev;
+      loanSnapshot = loan;
 
       const updatedLoans = prev.loans.map((l) =>
         l.loan_id === loanId ? { ...l, status: "active" as const } : l
@@ -346,12 +406,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         notifications: [lenderNotif, borrowerNotif, ...prev.notifications],
       };
     });
+    if (loanSnapshot) {
+      trackLoanAccepted(loanId, loanSnapshot.loan_amount);
+    }
   }, []);
 
   const declineLoan = useCallback((loanId: string) => {
+    let loanSnapshot: Loan | undefined;
     setState((prev) => {
       const loan = prev.loans.find((l) => l.loan_id === loanId);
       if (!loan || loan.status !== "pending") return prev;
+      loanSnapshot = loan;
 
       const updatedLoans = prev.loans.map((l) =>
         l.loan_id === loanId ? { ...l, status: "declined" as const } : l
@@ -383,6 +448,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         notifications: [lenderNotif, borrowerNotif, ...prev.notifications],
       };
     });
+    if (loanSnapshot) {
+      trackLoanRejected(loanId, loanSnapshot.loan_amount);
+    }
   }, []);
 
   // ─── Payment Registration (with security) ───────────────────────
@@ -476,6 +544,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           metadata: { paymentId: newPayment.payment_id, amount: clampedAmount, loanId: params.loanId },
         });
 
+        // Analytics
+        trackPaymentRegistered({
+          paymentId: newPayment.payment_id,
+          loanId: params.loanId,
+          amount: clampedAmount,
+        });
+
         return {
           ...prev,
           payments: [...prev.payments, newPayment],
@@ -541,12 +616,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const confirmPayment = useCallback((paymentId: string) => {
+    let paymentSnapshot: Payment | undefined;
+    let loanSnapshot: Loan | undefined;
+    let wasCompleted = false;
+
     setState((prev) => {
       const payment = prev.payments.find((p) => p.payment_id === paymentId);
       if (!payment || payment.status !== "pending_confirmation") return prev;
 
       const loan = prev.loans.find((l) => l.loan_id === payment.loan_id);
       if (!loan) return prev;
+
+      paymentSnapshot = payment;
+      loanSnapshot = loan;
 
       const updatedPayments = prev.payments.map((p) =>
         p.payment_id === paymentId ? { ...p, status: "confirmed" as const } : p
@@ -581,6 +663,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         payment.loan_id
       );
 
+      // Track whether loan just completed
+      const updatedLoan = updatedLoans.find((l) => l.loan_id === payment.loan_id);
+      wasCompleted = updatedLoan?.status === "completed" && loan.status !== "completed";
+
       return {
         ...prev,
         payments: updatedPayments,
@@ -593,6 +679,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ],
       };
     });
+
+    if (paymentSnapshot) {
+      trackPaymentConfirmed({
+        paymentId,
+        loanId: paymentSnapshot.loan_id,
+        amount: paymentSnapshot.amount,
+      });
+    }
+    if (wasCompleted && loanSnapshot) {
+      trackLoanCompleted({
+        loanId: loanSnapshot.loan_id,
+        totalAmount: loanSnapshot.total_amount,
+        numberOfPayments: loanSnapshot.number_of_payments,
+      });
+    }
   }, []);
 
   const rejectPayment = useCallback((paymentId: string) => {
@@ -864,6 +965,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         navigate,
         login,
         logout,
+        acceptTerms,
         selectLoan,
         selectPayment,
         createLoan,
@@ -902,6 +1004,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
 export function useApp() {
   const ctx = useContext(AppContext);
-  if (!ctx) throw new Error("useApp must be used within AppProvider");
+  if (!ctx) {
+    throw new Error("useApp must be used within AppProvider");
+  }
   return ctx;
+}
+
+/** Returns AppContext value or null — useful when the provider may not yet be mounted (e.g. during HMR). */
+export function useAppOptional() {
+  return useContext(AppContext);
 }

@@ -5,11 +5,14 @@ import { useInvitations } from "@/hooks/useInvitations";
 import LoanCard from "@/components/shared/LoanCard";
 import AvatarBadge from "@/components/shared/AvatarBadge";
 import { toast } from "sonner";
+import { useEffect } from "react";
+import { trackComputedMetrics, trackDailyActiveUser } from "@/services/analyticsService";
 
 export default function DashboardScreen() {
   const {
     currentUser,
     loans,
+    payments,
     navigate,
     selectLoan,
     getTotalLent,
@@ -18,6 +21,14 @@ export default function DashboardScreen() {
     getPendingLoanRequests,
     getPendingPaymentConfirmations,
   } = useApp();
+
+  // Track computed metrics and DAU each time the dashboard is visited
+  useEffect(() => {
+    if (currentUser) {
+      trackDailyActiveUser(currentUser.id);
+      trackComputedMetrics(loans, payments);
+    }
+  }, [currentUser, loans, payments]);
 
   const totalLent = getTotalLent();
   const totalBorrowed = getTotalBorrowed();

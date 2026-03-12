@@ -41,3 +41,18 @@ export {
   matchContacts,
   sendInvitation,
 } from "./contactService";
+
+// Analytics
+export {
+  identifyUser,
+  clearUser,
+  trackDailyActiveUser,
+  trackUserSignup,
+  trackLoanCreated,
+  trackLoanAccepted,
+  trackLoanRejected,
+  trackPaymentRegistered,
+  trackPaymentConfirmed,
+  trackLoanCompleted,
+  trackComputedMetrics,
+} from "./analyticsService";

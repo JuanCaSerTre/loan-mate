@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Camera, User as UserIcon } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { User } from "@/types/loan";
+import { trackUserSignup } from "@/services/analyticsService";
 
 export default function OnboardingScreen() {
   const { login } = useApp();
@@ -29,6 +30,7 @@ export default function OnboardingScreen() {
       avatar: initials,
       created_at: new Date().toISOString(),
     };
+    trackUserSignup(newUser.id);
     login(newUser);
   };
 

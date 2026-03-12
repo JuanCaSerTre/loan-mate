@@ -4,7 +4,7 @@
  * Also runs the payment reminder scheduler with configurable preferences.
  */
 import React, { useEffect, useRef, useCallback, createContext, useContext, useState } from "react";
-import { useApp } from "@/context/AppContext";
+import { useAppOptional } from "@/context/AppContext";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import {
   checkPaymentReminders,
@@ -52,9 +52,16 @@ export function usePushContext() {
 const REMINDER_CHECK_INTERVAL_MS = 60 * 60 * 1000; // Check every hour
 
 export function PushNotificationProvider({ children }: { children: React.ReactNode }) {
-  const { notifications, loans, payments, currentUser, addNotification } = useApp();
+  const appCtx = useAppOptional();
   const { isEnabled, permissionStatus, isSupported, isLoading, enable, disable, sendPush } =
     usePushNotifications();
+
+  // If AppContext isn't available yet (e.g. during HMR), render children with defaults
+  const notifications = appCtx?.notifications ?? [];
+  const loans = appCtx?.loans ?? [];
+  const payments = appCtx?.payments ?? [];
+  const currentUser = appCtx?.currentUser ?? null;
+  const addNotification = appCtx?.addNotification ?? (() => {});
 
   // ─── Reminder Preferences State ──────────────────────────────────
   const [reminderPreferences, setReminderPreferences] = useState<ReminderPreferences>(

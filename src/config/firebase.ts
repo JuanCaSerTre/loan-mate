@@ -7,6 +7,7 @@
  */
 import { initializeApp, type FirebaseApp } from "firebase/app";
 import { getMessaging, type Messaging } from "firebase/messaging";
+import { getAnalytics, type Analytics } from "firebase/analytics";
 
 // Firebase configuration — these are public client identifiers
 const firebaseConfig = {
@@ -20,6 +21,7 @@ const firebaseConfig = {
 
 let app: FirebaseApp | null = null;
 let messaging: Messaging | null = null;
+let analytics: Analytics | null = null;
 
 /**
  * Check if Firebase is properly configured
@@ -68,3 +70,19 @@ export function getFirebaseMessaging(): Messaging | null {
 }
 
 export const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || "";
+
+/**
+ * Get Firebase Analytics instance
+ */
+export function getFirebaseAnalytics(): Analytics | null {
+  if (analytics) return analytics;
+  const firebaseApp = getFirebaseApp();
+  if (!firebaseApp) return null;
+  try {
+    analytics = getAnalytics(firebaseApp);
+    return analytics;
+  } catch (error) {
+    console.error("[LoanMate] Failed to initialize Firebase Analytics:", error);
+    return null;
+  }
+}
