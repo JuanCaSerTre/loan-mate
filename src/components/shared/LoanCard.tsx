@@ -17,22 +17,23 @@ const statusColors = {
 };
 
 export default function LoanCard({ loan, index = 0 }: LoanCardProps) {
-  const { currentUser, getPaymentsForLoan, navigate, selectLoan } = useApp();
+  const { currentUser, getLoanComputed, navigate, selectLoan } = useApp();
   const isLender = loan.lender_id === currentUser?.id;
   const counterparty = isLender ? loan.borrower_name : loan.lender_name;
   const counterpartyAvatar = isLender ? loan.borrower_avatar : loan.lender_avatar;
 
-  const payments = getPaymentsForLoan(loan.loan_id);
-  const confirmedPayments = payments.filter((p) => p.status === "confirmed");
-  const confirmedAmount = confirmedPayments.reduce((s, p) => s + p.amount, 0);
-  const remaining = loan.total_amount - confirmedAmount;
-  const progress = Math.min((confirmedAmount / loan.total_amount) * 100, 100);
+  const { confirmedPayments, remainingBalance, progress } = getLoanComputed(loan.loan_id);
 
   const statusStyle = statusColors[loan.status];
 
   const handleTap = () => {
     selectLoan(loan.loan_id);
-    navigate("loan-details");
+    // If this is a pending loan and user is borrower, go to request screen
+    if (loan.status === "pending" && !isLender) {
+      navigate("loan-request");
+    } else {
+      navigate("loan-details");
+    }
   };
 
   return (
@@ -71,7 +72,7 @@ export default function LoanCard({ loan, index = 0 }: LoanCardProps) {
               className={`text-base font-black ${isLender ? "text-[#00C9A7]" : "text-[#FFB347]"}`}
               style={{ fontFamily: "'Syne', sans-serif" }}
             >
-              ${remaining.toLocaleString("en-US", { minimumFractionDigits: 0 })}
+              ${remainingBalance.toLocaleString("en-US", { minimumFractionDigits: 0 })}
             </span>
           </div>
 

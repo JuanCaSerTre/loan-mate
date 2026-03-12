@@ -3,7 +3,7 @@ import { ArrowLeft, Plus, Check, X, Clock } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import AvatarBadge from "@/components/shared/AvatarBadge";
 import { Payment } from "@/types/loan";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const statusIcons = {
   confirmed: { icon: Check, color: "text-[#00C9A7]", bg: "bg-[#00C9A7]/10", border: "border-[#00C9A7]/20", label: "Confirmed" },
@@ -16,23 +16,37 @@ export default function LoanDetailsScreen() {
     selectedLoanId,
     getLoanById,
     getPaymentsForLoan,
+    getLoanComputed,
     navigate,
     currentUser,
-    updatePaymentStatus,
-    updateLoanStatus,
-    addNotification,
+    confirmPayment,
+    rejectPayment,
     selectLoan,
   } = useApp();
   const [showCelebration, setShowCelebration] = useState(false);
+  const prevStatusRef = useRef<string | null>(null);
 
   const loan = selectedLoanId ? getLoanById(selectedLoanId) : null;
+  const loanStatus = loan?.status ?? null;
+
+  // Detect completion for celebration animation
+  useEffect(() => {
+    if (loanStatus === "completed" && prevStatusRef.current === "active") {
+      const t1 = setTimeout(() => {
+        setShowCelebration(true);
+        const t2 = setTimeout(() => setShowCelebration(false), 3000);
+        return () => clearTimeout(t2);
+      }, 300);
+      return () => clearTimeout(t1);
+    }
+    prevStatusRef.current = loanStatus;
+  }, [loanStatus]);
+
   if (!loan) return null;
 
   const payments = getPaymentsForLoan(loan.loan_id);
-  const confirmedPayments = payments.filter((p) => p.status === "confirmed");
-  const confirmedAmount = confirmedPayments.reduce((s, p) => s + p.amount, 0);
-  const remaining = loan.total_amount - confirmedAmount;
-  const progress = Math.min((confirmedAmount / loan.total_amount) * 100, 100);
+  const computed = getLoanComputed(loan.loan_id);
+  const { confirmedPayments, remainingBalance, progress } = computed;
 
   const isLender = loan.lender_id === currentUser?.id;
   const counterparty = isLender ? loan.borrower_name : loan.lender_name;
@@ -46,41 +60,11 @@ export default function LoanDetailsScreen() {
   };
 
   const handleConfirmPayment = (payment: Payment) => {
-    updatePaymentStatus(payment.payment_id, "confirmed");
-    addNotification({
-      id: `notif_${Date.now()}`,
-      type: "payment_confirmed",
-      title: "Payment Confirmed",
-      message: `You confirmed a payment of $${payment.amount.toLocaleString()} on loan with ${isLender ? counterparty : loan.lender_name}`,
-      loan_id: loan.loan_id,
-      payment_id: payment.payment_id,
-      read: false,
-      created_at: new Date().toISOString(),
-    });
-
-    // Check if all payments confirmed
-    const updatedConfirmed = payments.filter((p) => p.status === "confirmed" || p.payment_id === payment.payment_id);
-    if (updatedConfirmed.length >= loan.number_of_payments) {
-      setTimeout(() => {
-        updateLoanStatus(loan.loan_id, "completed");
-        setShowCelebration(true);
-        setTimeout(() => setShowCelebration(false), 3000);
-      }, 500);
-    }
+    confirmPayment(payment.payment_id);
   };
 
   const handleRejectPayment = (payment: Payment) => {
-    updatePaymentStatus(payment.payment_id, "rejected");
-    addNotification({
-      id: `notif_${Date.now()}`,
-      type: "payment_rejected",
-      title: "Payment Rejected",
-      message: `You rejected a payment of $${payment.amount.toLocaleString()}`,
-      loan_id: loan.loan_id,
-      payment_id: payment.payment_id,
-      read: false,
-      created_at: new Date().toISOString(),
-    });
+    rejectPayment(payment.payment_id);
   };
 
   return (
@@ -161,7 +145,7 @@ export default function LoanDetailsScreen() {
             </div>
             <div className="text-center">
               <p className="text-white/40 text-[10px] uppercase tracking-wider mb-1" style={{ fontFamily: "'Manrope', sans-serif" }}>Remaining</p>
-              <p className="text-[#FFB347] font-black text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>${remaining.toLocaleString()}</p>
+              <p className="text-[#FFB347] font-black text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>${remainingBalance.toLocaleString()}</p>
             </div>
           </div>
 

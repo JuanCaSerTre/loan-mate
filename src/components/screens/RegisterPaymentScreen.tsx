@@ -1,25 +1,22 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Check } from "lucide-react";
+import { ArrowLeft, Check, AlertCircle } from "lucide-react";
 import { useApp } from "@/context/AppContext";
-import { Payment } from "@/types/loan";
 import AvatarBadge from "@/components/shared/AvatarBadge";
 import { toast } from "sonner";
 
 export default function RegisterPaymentScreen() {
-  const { selectedLoanId, getLoanById, getPaymentsForLoan, navigate, currentUser, addPayment, addNotification } = useApp();
+  const { selectedLoanId, getLoanById, getLoanComputed, navigate, currentUser, registerPayment } = useApp();
   const loan = selectedLoanId ? getLoanById(selectedLoanId) : null;
+  const computed = selectedLoanId ? getLoanComputed(selectedLoanId) : null;
 
-  const payments = selectedLoanId ? getPaymentsForLoan(selectedLoanId) : [];
-  const confirmedAmount = payments
-    .filter((p) => p.status === "confirmed")
-    .reduce((s, p) => s + p.amount, 0);
-  const remaining = loan ? loan.total_amount - confirmedAmount : 0;
-  const scheduledAmount = loan ? loan.total_amount / loan.number_of_payments : 0;
+  const remaining = computed?.remainingBalance ?? 0;
+  const scheduledAmount = computed?.scheduledPaymentAmount ?? 0;
 
-  const [amount, setAmount] = useState(scheduledAmount.toFixed(2));
+  const [amount, setAmount] = useState(scheduledAmount > 0 ? Math.min(scheduledAmount, remaining).toFixed(2) : "0.00");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [note, setNote] = useState("");
+  const [amountError, setAmountError] = useState("");
 
   if (!loan) return null;
 
@@ -27,28 +24,30 @@ export default function RegisterPaymentScreen() {
   const counterparty = isLender ? loan.borrower_name : loan.lender_name;
   const counterpartyAvatar = isLender ? loan.borrower_avatar : loan.lender_avatar;
 
+  const validateAmount = (val: string) => {
+    const num = parseFloat(val);
+    if (isNaN(num) || num <= 0) {
+      setAmountError("Amount must be greater than 0");
+      return false;
+    }
+    if (num > remaining) {
+      setAmountError(`Amount exceeds remaining balance ($${remaining.toLocaleString("en-US", { minimumFractionDigits: 2 })})`);
+      return false;
+    }
+    setAmountError("");
+    return true;
+  };
+
   const handleSubmit = () => {
-    const newPayment: Payment = {
-      payment_id: `pay_${Date.now()}`,
-      loan_id: loan.loan_id,
+    if (!validateAmount(amount)) return;
+
+    registerPayment({
+      loanId: loan.loan_id,
       amount: parseFloat(amount),
-      created_by_user: currentUser!.id,
-      status: "pending_confirmation",
+      paymentDate: date,
       note: note || undefined,
-      created_at: new Date().toISOString(),
-      payment_date: date,
-    };
-    addPayment(newPayment);
-    addNotification({
-      id: `notif_${Date.now()}`,
-      type: "payment_registered",
-      title: "Payment Registered",
-      message: `You registered a payment of $${parseFloat(amount).toLocaleString()} for ${counterparty} to confirm`,
-      loan_id: loan.loan_id,
-      payment_id: newPayment.payment_id,
-      read: false,
-      created_at: new Date().toISOString(),
     });
+
     toast.success("Payment submitted!", {
       description: `$${parseFloat(amount).toLocaleString()} sent for confirmation`,
       style: {
@@ -106,14 +105,27 @@ export default function RegisterPaymentScreen() {
             <input
               type="number"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="w-full h-16 pl-10 pr-4 rounded-2xl bg-[#1A2B3C] border border-white/10 text-white text-2xl font-black focus:outline-none focus:border-[#00C9A7]/50"
+              onChange={(e) => {
+                setAmount(e.target.value);
+                setAmountError("");
+              }}
+              className={`w-full h-16 pl-10 pr-4 rounded-2xl bg-[#1A2B3C] border text-white text-2xl font-black focus:outline-none ${
+                amountError ? "border-[#FF6B6B]/50 focus:border-[#FF6B6B]/50" : "border-white/10 focus:border-[#00C9A7]/50"
+              }`}
               style={{ fontFamily: "'JetBrains Mono', monospace" }}
             />
           </div>
           <p className="text-white/30 text-xs mt-2" style={{ fontFamily: "'Manrope', sans-serif" }}>
             Scheduled: ${scheduledAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })} per payment
           </p>
+          {amountError && (
+            <div className="flex items-center gap-1.5 mt-2">
+              <AlertCircle className="w-3.5 h-3.5 text-[#FF6B6B]" />
+              <p className="text-[#FF6B6B] text-xs" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                {amountError}
+              </p>
+            </div>
+          )}
         </motion.div>
 
         {/* Date */}

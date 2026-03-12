@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ChevronRight, Search, Check } from "lucide-react";
+import { X, Search, Check } from "lucide-react";
 import { useApp } from "@/context/AppContext";
-import { Loan, PaymentFrequency } from "@/types/loan";
+import { PaymentFrequency } from "@/types/loan";
 import AvatarBadge from "@/components/shared/AvatarBadge";
+import { calculateTotalAmount, calculateDueDate } from "@/lib/calculations";
+import { toast } from "sonner";
 
 type Step = 1 | 2 | 3;
 
 export default function CreateLoanScreen() {
-  const { navigate, currentUser, findUserByPhone, addLoan, addNotification, selectLoan } = useApp();
+  const { navigate, currentUser, findUserByPhone, createLoan } = useApp();
   const [step, setStep] = useState<Step>(1);
   const [borrowerPhone, setBorrowerPhone] = useState("");
   const [foundUser, setFoundUser] = useState<ReturnType<typeof findUserByPhone>>(undefined);
@@ -25,19 +27,20 @@ export default function CreateLoanScreen() {
     { id: "monthly", label: "Monthly" },
   ];
 
-  const calculateDueDate = () => {
-    const start = new Date(startDate);
-    const n = parseInt(numPayments) || 1;
-    if (frequency === "weekly") start.setDate(start.getDate() + n * 7);
-    else if (frequency === "biweekly") start.setDate(start.getDate() + n * 14);
-    else start.setMonth(start.getMonth() + n);
-    return start.toISOString().split("T")[0];
+  const getDueDate = () => {
+    return calculateDueDate(startDate, parseInt(numPayments) || 1, frequency);
   };
 
   const totalAmount = () => {
     const a = parseFloat(amount) || 0;
     const r = parseFloat(interestRate) || 0;
-    return a + (a * r) / 100;
+    return calculateTotalAmount(a, r);
+  };
+
+  const perPayment = () => {
+    const total = totalAmount();
+    const n = parseInt(numPayments) || 1;
+    return Math.round((total / n) * 100) / 100;
   };
 
   const handleFindBorrower = () => {
@@ -62,38 +65,31 @@ export default function CreateLoanScreen() {
 
   const handleSubmit = () => {
     if (!foundUser || !currentUser) return;
-    const loanId = `loan_${Date.now()}`;
-    const dueDate = calculateDueDate();
-    const newLoan: Loan = {
-      loan_id: loanId,
-      lender_id: currentUser.id,
-      borrower_id: foundUser.id,
-      borrower_phone: foundUser.phone_number,
-      lender_name: currentUser.name,
-      borrower_name: foundUser.name,
-      lender_avatar: currentUser.avatar,
-      borrower_avatar: foundUser.avatar,
-      loan_amount: parseFloat(amount),
-      interest_rate: parseFloat(interestRate) || 0,
-      total_amount: totalAmount(),
-      number_of_payments: parseInt(numPayments),
-      payment_frequency: frequency,
-      start_date: startDate,
-      due_date: dueDate,
-      status: "pending",
-      created_at: new Date().toISOString(),
-    };
-    addLoan(newLoan);
-    addNotification({
-      id: `notif_${Date.now()}`,
-      type: "loan_request",
-      title: "Loan Request Sent",
-      message: `You sent a loan request to ${foundUser.name} for $${parseFloat(amount).toLocaleString()}`,
-      loan_id: loanId,
-      read: false,
-      created_at: new Date().toISOString(),
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      toast.error("Invalid loan amount");
+      return;
+    }
+
+    createLoan({
+      borrower: foundUser,
+      amount: parsedAmount,
+      interestRate: parseFloat(interestRate) || 0,
+      numberOfPayments: parseInt(numPayments) || 1,
+      paymentFrequency: frequency,
+      startDate: startDate,
+      dueDate: getDueDate(),
     });
-    selectLoan(loanId);
+
+    toast.success("Loan request sent!", {
+      description: `$${parsedAmount.toLocaleString()} to ${foundUser.name}`,
+      style: {
+        background: "#1A2B3C",
+        border: "1px solid rgba(0,201,167,0.3)",
+        color: "#fff",
+      },
+    });
+
     navigate("dashboard");
   };
 
@@ -341,6 +337,34 @@ export default function CreateLoanScreen() {
                 />
               </div>
 
+              {/* Auto-calculated summary */}
+              {amount && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  className="bg-[#00C9A7]/5 border border-[#00C9A7]/10 rounded-2xl p-3 space-y-1"
+                >
+                  <div className="flex justify-between">
+                    <span className="text-white/40 text-xs" style={{ fontFamily: "'Manrope', sans-serif" }}>Total Repayment</span>
+                    <span className="text-[#00C9A7] text-xs font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                      ${totalAmount().toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-white/40 text-xs" style={{ fontFamily: "'Manrope', sans-serif" }}>Per Payment</span>
+                    <span className="text-white/70 text-xs font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                      ${perPayment().toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-white/40 text-xs" style={{ fontFamily: "'Manrope', sans-serif" }}>Due Date</span>
+                    <span className="text-white/70 text-xs font-semibold" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                      {new Date(getDueDate()).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    </span>
+                  </div>
+                </motion.div>
+              )}
+
               <div className="flex gap-3 mt-2">
                 <button
                   onClick={() => setStep(1)}
@@ -400,9 +424,9 @@ export default function CreateLoanScreen() {
                     { label: "Interest Rate", value: interestRate ? `${interestRate}%` : "0% (no interest)" },
                     { label: "Total Amount", value: `$${totalAmount().toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
                     { label: "Payments", value: `${numPayments} × ${frequency}` },
-                    { label: "Per Payment", value: `$${(totalAmount() / parseInt(numPayments)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+                    { label: "Per Payment", value: `$${perPayment().toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
                     { label: "Start Date", value: new Date(startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) },
-                    { label: "Due Date", value: new Date(calculateDueDate()).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) },
+                    { label: "Due Date", value: new Date(getDueDate()).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) },
                   ].map(({ label, value }) => (
                     <div key={label} className="flex justify-between">
                       <span className="text-white/40 text-sm" style={{ fontFamily: "'Manrope', sans-serif" }}>{label}</span>

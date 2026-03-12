@@ -4,7 +4,7 @@ import { useApp } from "@/context/AppContext";
 import AvatarBadge from "@/components/shared/AvatarBadge";
 
 export default function LoanRequestScreen() {
-  const { selectedLoanId, getLoanById, navigate, updateLoanStatus, addNotification, currentUser } = useApp();
+  const { selectedLoanId, getLoanById, navigate, acceptLoan, declineLoan, selectLoan } = useApp();
   const loan = selectedLoanId ? getLoanById(selectedLoanId) : null;
 
   if (!loan) {
@@ -15,33 +15,33 @@ export default function LoanRequestScreen() {
     );
   }
 
+  if (loan.status !== "pending") {
+    return (
+      <div className="flex flex-col h-full bg-[#0D1B2A] items-center justify-center gap-3">
+        <p className="text-white/40">This loan is already {loan.status}</p>
+        <button
+          onClick={() => {
+            selectLoan(loan.loan_id);
+            navigate("loan-details");
+          }}
+          className="text-[#00C9A7] text-sm font-semibold"
+        >
+          View Loan Details
+        </button>
+      </div>
+    );
+  }
+
   const lender = loan.lender_name;
 
   const handleAccept = () => {
-    updateLoanStatus(loan.loan_id, "active");
-    addNotification({
-      id: `notif_${Date.now()}`,
-      type: "loan_accepted",
-      title: "Loan Accepted",
-      message: `You accepted the loan of $${loan.loan_amount.toLocaleString()} from ${lender}`,
-      loan_id: loan.loan_id,
-      read: false,
-      created_at: new Date().toISOString(),
-    });
+    acceptLoan(loan.loan_id);
+    selectLoan(loan.loan_id);
     navigate("loan-details");
   };
 
   const handleDecline = () => {
-    updateLoanStatus(loan.loan_id, "declined");
-    addNotification({
-      id: `notif_${Date.now()}`,
-      type: "loan_declined",
-      title: "Loan Declined",
-      message: `You declined the loan from ${lender}`,
-      loan_id: loan.loan_id,
-      read: false,
-      created_at: new Date().toISOString(),
-    });
+    declineLoan(loan.loan_id);
     navigate("dashboard");
   };
 

@@ -13,11 +13,15 @@ export default function DashboardScreen() {
     getTotalLent,
     getTotalBorrowed,
     getPendingActions,
+    getPendingLoanRequests,
+    getPendingPaymentConfirmations,
   } = useApp();
 
   const totalLent = getTotalLent();
   const totalBorrowed = getTotalBorrowed();
   const pendingCount = getPendingActions();
+  const pendingLoanRequests = getPendingLoanRequests();
+  const pendingPaymentConfirmations = getPendingPaymentConfirmations();
 
   const activeLoans = loans.filter(
     (l) =>
@@ -25,10 +29,17 @@ export default function DashboardScreen() {
       (l.status === "active" || l.status === "pending")
   );
 
-  // Find pending loan requests for current user as borrower
-  const pendingLoanRequests = loans.filter(
-    (l) => l.status === "pending" && l.borrower_id === currentUser?.id
-  );
+  const handlePendingBannerTap = () => {
+    // Prioritize loan requests over payment confirmations
+    if (pendingLoanRequests.length > 0) {
+      selectLoan(pendingLoanRequests[0].loan_id);
+      navigate("loan-request");
+    } else if (pendingPaymentConfirmations.length > 0) {
+      const payment = pendingPaymentConfirmations[0];
+      selectLoan(payment.loan_id);
+      navigate("loan-details");
+    }
+  };
 
   return (
     <div className="flex flex-col h-full bg-[#0D1B2A] overflow-hidden">
@@ -100,12 +111,7 @@ export default function DashboardScreen() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            onClick={() => {
-              if (pendingLoanRequests.length > 0) {
-                selectLoan(pendingLoanRequests[0].loan_id);
-                navigate("loan-request");
-              }
-            }}
+            onClick={() => handlePendingBannerTap()}
             className="w-full flex items-center gap-3 bg-[#FFB347]/10 border border-[#FFB347]/30 rounded-2xl px-4 py-3 active:scale-[0.98] transition-transform"
           >
             <div className="w-8 h-8 rounded-xl bg-[#FFB347]/20 flex items-center justify-center flex-shrink-0">
@@ -116,7 +122,10 @@ export default function DashboardScreen() {
                 {pendingCount} action{pendingCount > 1 ? "s" : ""} need your attention
               </p>
               <p className="text-[#FFB347]/60 text-xs" style={{ fontFamily: "'Manrope', sans-serif" }}>
-                Tap to review
+                {pendingLoanRequests.length > 0 && `${pendingLoanRequests.length} loan request${pendingLoanRequests.length > 1 ? "s" : ""}`}
+                {pendingLoanRequests.length > 0 && pendingPaymentConfirmations.length > 0 && " · "}
+                {pendingPaymentConfirmations.length > 0 && `${pendingPaymentConfirmations.length} payment${pendingPaymentConfirmations.length > 1 ? "s" : ""} to confirm`}
+                {pendingLoanRequests.length === 0 && pendingPaymentConfirmations.length === 0 && "Tap to review"}
               </p>
             </div>
             <div className="w-6 h-6 rounded-full bg-[#FFB347] flex items-center justify-center">
