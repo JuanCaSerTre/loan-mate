@@ -5,48 +5,45 @@ interface AvatarBadgeProps {
 }
 
 const sizeMap = {
-  sm: "w-8 h-8 text-xs",
-  md: "w-10 h-10 text-sm",
-  lg: "w-14 h-14 text-base",
+  sm: "w-8 h-8 text-[10px]",
+  md: "w-10 h-10 text-xs",
+  lg: "w-14 h-14 text-sm",
 };
 
-const colorMap: Record<string, string> = {
-  A: "from-teal-500 to-cyan-600",
-  B: "from-purple-500 to-indigo-600",
-  C: "from-orange-500 to-red-500",
-  D: "from-pink-500 to-rose-600",
-  E: "from-green-500 to-emerald-600",
-  F: "from-yellow-500 to-amber-600",
-  G: "from-blue-500 to-sky-600",
-  H: "from-violet-500 to-purple-600",
-  J: "from-teal-400 to-green-500",
-  K: "from-red-400 to-orange-500",
-  L: "from-indigo-400 to-blue-500",
-  M: "from-pink-400 to-purple-500",
-  N: "from-cyan-400 to-teal-500",
-  O: "from-amber-400 to-yellow-500",
-  P: "from-emerald-400 to-green-500",
-  Q: "from-fuchsia-400 to-pink-500",
-  R: "from-rose-400 to-red-500",
-  S: "from-sky-400 to-blue-500",
-  T: "from-teal-300 to-cyan-400",
+const colorMap: Record<string, { bg: string; text: string }> = {
+  A: { bg: "bg-blue-100", text: "text-blue-700" },
+  B: { bg: "bg-purple-100", text: "text-purple-700" },
+  C: { bg: "bg-orange-100", text: "text-orange-700" },
+  D: { bg: "bg-pink-100", text: "text-pink-700" },
+  E: { bg: "bg-emerald-100", text: "text-emerald-700" },
+  F: { bg: "bg-amber-100", text: "text-amber-700" },
+  G: { bg: "bg-sky-100", text: "text-sky-700" },
+  H: { bg: "bg-violet-100", text: "text-violet-700" },
+  J: { bg: "bg-teal-100", text: "text-teal-700" },
+  K: { bg: "bg-red-100", text: "text-red-700" },
+  L: { bg: "bg-indigo-100", text: "text-indigo-700" },
+  M: { bg: "bg-fuchsia-100", text: "text-fuchsia-700" },
+  N: { bg: "bg-cyan-100", text: "text-cyan-700" },
+  O: { bg: "bg-lime-100", text: "text-lime-700" },
+  P: { bg: "bg-emerald-100", text: "text-emerald-700" },
+  Q: { bg: "bg-rose-100", text: "text-rose-700" },
+  R: { bg: "bg-red-100", text: "text-red-600" },
+  S: { bg: "bg-sky-100", text: "text-sky-700" },
+  T: { bg: "bg-teal-100", text: "text-teal-700" },
 };
 
-function getGradient(initials: string): string {
+function getColors(initials: string) {
   const first = initials[0]?.toUpperCase() || "A";
-  return colorMap[first] || "from-teal-500 to-cyan-600";
+  return colorMap[first] || { bg: "bg-blue-100", text: "text-blue-700" };
 }
 
 export default function AvatarBadge({ initials, size = "md", className = "" }: AvatarBadgeProps) {
-  const gradient = getGradient(initials);
+  const colors = getColors(initials);
   return (
     <div
-      className={`rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center flex-shrink-0 ${sizeMap[size]} ${className}`}
+      className={`rounded-full ${colors.bg} flex items-center justify-center flex-shrink-0 ${sizeMap[size]} ${className}`}
     >
-      <span
-        className="font-bold text-white"
-        style={{ fontFamily: "'Syne', sans-serif" }}
-      >
+      <span className={`font-bold ${colors.text}`}>
         {initials.slice(0, 2)}
       </span>
     </div>

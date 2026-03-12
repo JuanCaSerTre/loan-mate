@@ -12,10 +12,11 @@ import LoanRequestScreen from "@/components/screens/LoanRequestScreen";
 import LoanDetailsScreen from "@/components/screens/LoanDetailsScreen";
 import RegisterPaymentScreen from "@/components/screens/RegisterPaymentScreen";
 import NotificationsScreen from "@/components/screens/NotificationsScreen";
+import ContactsScreen from "@/components/screens/ContactsScreen";
 import ProfileScreen from "@/components/screens/ProfileScreen";
 import { Toaster } from "sonner";
 
-const NAV_SCREENS = ["dashboard", "loans", "notifications", "profile"];
+const NAV_SCREENS = ["dashboard", "loans", "contacts", "notifications", "profile"];
 
 function AppContent() {
   const { currentScreen } = useApp();
@@ -33,13 +34,14 @@ function AppContent() {
       case "loan-details": return <LoanDetailsScreen />;
       case "register-payment": return <RegisterPaymentScreen />;
       case "notifications": return <NotificationsScreen />;
+      case "contacts": return <ContactsScreen />;
       case "profile": return <ProfileScreen />;
       default: return <DashboardScreen />;
     }
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#0D1B2A] overflow-hidden relative">
+    <div className="flex flex-col h-full bg-[#F8F9FB] overflow-hidden relative">
       <div className="flex-1 overflow-hidden relative">
         <AnimatePresence mode="wait">
           <motion.div

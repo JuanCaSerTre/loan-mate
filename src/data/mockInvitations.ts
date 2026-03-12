@@ -1,0 +1,70 @@
+/**
+ * LoanMate — Mock Invitation Data
+ * Sample invitation records for development/demo.
+ */
+import { Invitation } from "@/types/invitation";
+
+export const mockInvitations: Invitation[] = [
+  {
+    id: "inv_001",
+    inviter_id: "user_current",
+    inviter_name: "Alex Johnson",
+    invitee_phone: "+15558881234",
+    invitee_name: "David Wilson",
+    method: "sms",
+    status: "registered",
+    referral_code: "LM-X7K9P2",
+    invitation_link: "https://loanmate.app/download?ref=LM-X7K9P2",
+    created_at: "2024-03-10T14:30:00Z",
+    registered_at: "2024-03-11T09:15:00Z",
+  },
+  {
+    id: "inv_002",
+    inviter_id: "user_current",
+    inviter_name: "Alex Johnson",
+    invitee_phone: "+15557779999",
+    invitee_name: "Emma Thompson",
+    method: "whatsapp",
+    status: "sent",
+    referral_code: "LM-B3N8R5",
+    invitation_link: "https://loanmate.app/download?ref=LM-B3N8R5",
+    created_at: "2024-03-12T11:00:00Z",
+  },
+  {
+    id: "inv_003",
+    inviter_id: "user_current",
+    inviter_name: "Alex Johnson",
+    invitee_name: "Mike Rodriguez",
+    invitee_phone: "+15553334444",
+    method: "sms",
+    status: "connected",
+    referral_code: "LM-F6T2W9",
+    invitation_link: "https://loanmate.app/download?ref=LM-F6T2W9",
+    created_at: "2024-03-08T16:45:00Z",
+    registered_at: "2024-03-09T10:20:00Z",
+    connected_at: "2024-03-09T10:22:00Z",
+  },
+  {
+    id: "inv_004",
+    inviter_id: "user_current",
+    inviter_name: "Alex Johnson",
+    method: "copy_link",
+    status: "sent",
+    referral_code: "LM-H4M7Q3",
+    invitation_link: "https://loanmate.app/download?ref=LM-H4M7Q3",
+    created_at: "2024-03-14T08:30:00Z",
+  },
+  {
+    id: "inv_005",
+    inviter_id: "user_current",
+    inviter_name: "Alex Johnson",
+    invitee_phone: "+15552226666",
+    invitee_name: "Lisa Park",
+    method: "whatsapp",
+    status: "registered",
+    referral_code: "LM-Y5J8V4",
+    invitation_link: "https://loanmate.app/download?ref=LM-Y5J8V4",
+    created_at: "2024-03-06T13:00:00Z",
+    registered_at: "2024-03-07T17:30:00Z",
+  },
+];

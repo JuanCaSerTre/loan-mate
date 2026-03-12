@@ -77,6 +77,36 @@ export function isLoanOverdue(loan: Loan): boolean {
 }
 
 /**
+ * Generate a full payment schedule for a loan.
+ */
+export function generatePaymentSchedule(
+  principal: number,
+  interestRate: number,
+  numberOfPayments: number,
+  frequency: PaymentFrequency,
+  startDate: string
+): Array<{ paymentNumber: number; dueDate: string; amount: number }> {
+  const totalAmount = calculateTotalAmount(principal, interestRate);
+  const basePayment = Math.floor((totalAmount / numberOfPayments) * 100) / 100;
+  const remainder = Math.round((totalAmount - basePayment * numberOfPayments) * 100) / 100;
+  const daysPerPeriod = frequency === "weekly" ? 7 : frequency === "biweekly" ? 14 : 30;
+  const start = new Date(startDate);
+
+  return Array.from({ length: numberOfPayments }, (_, i) => {
+    const dueDate = new Date(start.getTime() + (i + 1) * daysPerPeriod * 24 * 60 * 60 * 1000);
+    // Add rounding remainder to last payment
+    const amount = i === numberOfPayments - 1
+      ? Math.round((basePayment + remainder) * 100) / 100
+      : basePayment;
+    return {
+      paymentNumber: i + 1,
+      dueDate: dueDate.toISOString().split("T")[0],
+      amount,
+    };
+  });
+}
+
+/**
  * Get number of days until next payment or loan due date.
  */
 export function daysUntilDue(dateStr: string): number {

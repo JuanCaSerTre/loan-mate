@@ -1,13 +1,18 @@
 /**
  * LoanMate — Push Notification Provider
  * Wraps the app to intercept notification events and trigger browser push notifications.
- * Also runs the payment reminder scheduler.
+ * Also runs the payment reminder scheduler with configurable preferences.
  */
 import React, { useEffect, useRef, useCallback, createContext, useContext, useState } from "react";
 import { useApp } from "@/context/AppContext";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
-import { checkPaymentReminders } from "@/services/paymentReminderService";
-import { Notification as LoanNotification } from "@/types/loan";
+import {
+  checkPaymentReminders,
+  loadReminderPreferences,
+  saveReminderPreferences,
+  type ReminderPreferences,
+  DEFAULT_REMINDER_PREFERENCES,
+} from "@/services/paymentReminderService";
 import { toast } from "sonner";
 
 interface PushNotificationContextType {
@@ -23,6 +28,10 @@ interface PushNotificationContextType {
   enablePush: () => Promise<boolean>;
   /** Disable push notifications */
   disablePush: () => void;
+  /** Payment reminder preferences */
+  reminderPreferences: ReminderPreferences;
+  /** Update reminder preferences */
+  updateReminderPreferences: (prefs: Partial<ReminderPreferences>) => void;
 }
 
 const PushNotificationContext = createContext<PushNotificationContextType>({
@@ -32,6 +41,8 @@ const PushNotificationContext = createContext<PushNotificationContextType>({
   isLoading: false,
   enablePush: async () => false,
   disablePush: () => {},
+  reminderPreferences: DEFAULT_REMINDER_PREFERENCES,
+  updateReminderPreferences: () => {},
 });
 
 export function usePushContext() {
@@ -44,6 +55,19 @@ export function PushNotificationProvider({ children }: { children: React.ReactNo
   const { notifications, loans, payments, currentUser, addNotification } = useApp();
   const { isEnabled, permissionStatus, isSupported, isLoading, enable, disable, sendPush } =
     usePushNotifications();
+
+  // ─── Reminder Preferences State ──────────────────────────────────
+  const [reminderPreferences, setReminderPreferences] = useState<ReminderPreferences>(
+    loadReminderPreferences
+  );
+
+  const updateReminderPreferences = useCallback((updates: Partial<ReminderPreferences>) => {
+    setReminderPreferences((prev) => {
+      const newPrefs = { ...prev, ...updates };
+      saveReminderPreferences(newPrefs);
+      return newPrefs;
+    });
+  }, []);
 
   // Track previously seen notification count to detect new ones
   const prevNotifCountRef = useRef<number>(notifications.length);
@@ -80,12 +104,12 @@ export function PushNotificationProvider({ children }: { children: React.ReactNo
   const checkReminders = useCallback(() => {
     if (!currentUser) return;
 
-    const reminders = checkPaymentReminders(loans, payments, currentUser.id);
+    const reminders = checkPaymentReminders(loans, payments, currentUser.id, reminderPreferences);
     for (const reminder of reminders) {
       addNotification(reminder);
       // Push notification will be triggered by the notification change above
     }
-  }, [loans, payments, currentUser, addNotification]);
+  }, [loans, payments, currentUser, addNotification, reminderPreferences]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -143,6 +167,8 @@ export function PushNotificationProvider({ children }: { children: React.ReactNo
     isLoading,
     enablePush: enable,
     disablePush: disable,
+    reminderPreferences,
+    updateReminderPreferences,
   };
 
   return (

@@ -107,30 +107,24 @@ export default function LoginScreen() {
   }, []);
 
   return (
-    <div className="relative flex flex-col h-full overflow-hidden bg-[#0D1B2A]">
-      {/* Background gradients */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute -top-20 -left-20 w-64 h-64 rounded-full bg-[#00C9A7] opacity-[0.04] blur-3xl" />
-        <div className="absolute bottom-1/4 right-0 w-48 h-48 rounded-full bg-[#00C9A7] opacity-[0.04] blur-3xl" />
-      </div>
-
-      {/* Header */}
-      <div className="pt-16 pb-8 px-6 z-10">
+    <div className="relative flex flex-col h-full overflow-hidden bg-white">
+      {/* Header with deep blue top section */}
+      <div className="bg-[#1B2E4B] px-6 pt-16 pb-10 rounded-b-[32px]">
         <motion.div
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.5 }}
         >
-          <h1 className="text-4xl font-black text-white" style={{ fontFamily: "'Syne', sans-serif" }}>
-            Loan<span className="text-[#00C9A7]">Mate</span>
+          <h1 className="text-3xl font-extrabold text-white">
+            Loan<span className="text-emerald-400">Mate</span>
           </h1>
-          <p className="text-white/50 mt-2 text-sm" style={{ fontFamily: "'Manrope', sans-serif" }}>
+          <p className="text-white/60 mt-2 text-sm font-medium">
             {step === "phone" ? "Enter your phone number to get started" : "Enter the 6-digit code we sent"}
           </p>
         </motion.div>
       </div>
 
-      <div className="flex-1 px-6 z-10">
+      <div className="flex-1 px-6 pt-8 z-10">
         <AnimatePresence mode="wait">
           {step === "phone" ? (
             <motion.div
@@ -146,11 +140,11 @@ export default function LoginScreen() {
                 <div className="relative">
                   <button
                     onClick={() => setShowCountryPicker(!showCountryPicker)}
-                    className="flex items-center gap-2 h-14 px-4 rounded-2xl bg-[#1A2B3C] border border-white/10 text-white text-sm font-semibold min-w-[90px]"
+                    className="flex items-center gap-2 h-14 px-4 rounded-2xl bg-gray-50 border border-gray-200 text-gray-900 text-sm font-semibold min-w-[90px]"
                   >
                     <span>{countryCode.flag}</span>
                     <span>{countryCode.code}</span>
-                    <ChevronDown className="w-3 h-3 text-white/40" />
+                    <ChevronDown className="w-3 h-3 text-gray-400" />
                   </button>
                   <AnimatePresence>
                     {showCountryPicker && (
@@ -158,7 +152,7 @@ export default function LoginScreen() {
                         initial={{ opacity: 0, y: -8 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -8 }}
-                        className="absolute top-16 left-0 bg-[#1A2B3C] border border-white/10 rounded-2xl overflow-hidden z-50 w-40 shadow-2xl"
+                        className="absolute top-16 left-0 bg-white border border-gray-200 rounded-2xl overflow-hidden z-50 w-44 shadow-xl"
                       >
                         {COUNTRY_CODES.map((c) => (
                           <button
@@ -167,10 +161,10 @@ export default function LoginScreen() {
                               setCountryCode(c);
                               setShowCountryPicker(false);
                             }}
-                            className="flex items-center gap-3 w-full px-4 py-3 text-sm text-white hover:bg-white/5 transition-colors"
+                            className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                           >
                             <span>{c.flag}</span>
-                            <span className="text-white/60">{c.code}</span>
+                            <span className="text-gray-400">{c.code}</span>
                             <span>{c.name}</span>
                           </button>
                         ))}
@@ -189,26 +183,24 @@ export default function LoginScreen() {
                     setError("");
                   }}
                   onKeyDown={(e) => e.key === "Enter" && handleSendCode()}
-                  className="flex-1 h-14 px-4 rounded-2xl bg-[#1A2B3C] border border-white/10 text-white placeholder-white/30 text-base font-medium focus:outline-none focus:border-[#00C9A7]/50 transition-colors"
-                  style={{ fontFamily: "'Manrope', sans-serif" }}
+                  className="flex-1 h-14 px-4 rounded-2xl bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 text-base font-medium focus:outline-none focus:border-[#1B2E4B] focus:ring-1 focus:ring-[#1B2E4B]/20 transition-all"
                 />
               </div>
 
               {error && (
-                <p className="text-[#FF6B6B] text-sm font-medium" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                <p className="text-red-500 text-sm font-medium">
                   {error}
                 </p>
               )}
 
               <button
                 onClick={handleSendCode}
-                className="w-full h-14 rounded-2xl bg-[#00C9A7] text-[#0D1B2A] font-bold text-base active:scale-[0.98] transition-transform mt-2"
-                style={{ fontFamily: "'Manrope', sans-serif" }}
+                className="w-full h-14 rounded-2xl bg-[#1B2E4B] text-white font-semibold text-base active:scale-[0.98] transition-transform mt-2 shadow-lg shadow-[#1B2E4B]/20"
               >
                 Send Code
               </button>
 
-              <p className="text-center text-white/30 text-xs mt-4" style={{ fontFamily: "'Manrope', sans-serif" }}>
+              <p className="text-center text-gray-400 text-xs mt-4">
                 By continuing, you agree to our Terms of Service and Privacy Policy
               </p>
             </motion.div>
@@ -222,13 +214,12 @@ export default function LoginScreen() {
               className="flex flex-col gap-6"
             >
               <div>
-                <p className="text-white/60 text-sm mb-1" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                <p className="text-gray-500 text-sm mb-1">
                   Sent to {countryCode.code} {phone}
                 </p>
                 <button
                   onClick={() => setStep("phone")}
-                  className="text-[#00C9A7] text-sm font-semibold"
-                  style={{ fontFamily: "'Manrope', sans-serif" }}
+                  className="text-[#1B2E4B] text-sm font-semibold"
                 >
                   Change number
                 </button>
@@ -250,12 +241,12 @@ export default function LoginScreen() {
                     value={digit}
                     onChange={(e) => handleOtpChange(idx, e.target.value)}
                     onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                    className={`w-12 h-14 rounded-xl text-center text-xl font-bold text-white bg-[#1A2B3C] border transition-all focus:outline-none ${
+                    className={`w-12 h-14 rounded-xl text-center text-xl font-bold text-gray-900 bg-gray-50 border transition-all focus:outline-none ${
                       isShaking
-                        ? "border-[#FF6B6B] shadow-[0_0_12px_rgba(255,107,107,0.4)]"
+                        ? "border-red-400 shadow-[0_0_12px_rgba(239,68,68,0.2)]"
                         : digit
-                        ? "border-[#00C9A7] shadow-[0_0_8px_rgba(0,201,167,0.3)]"
-                        : "border-white/10 focus:border-[#00C9A7]/50"
+                        ? "border-[#1B2E4B] shadow-sm"
+                        : "border-gray-200 focus:border-[#1B2E4B]"
                     }`}
                     style={{ fontFamily: "'JetBrains Mono', monospace" }}
                   />
@@ -263,7 +254,7 @@ export default function LoginScreen() {
               </motion.div>
 
               {error && (
-                <p className="text-[#FF6B6B] text-sm font-medium text-center" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                <p className="text-red-500 text-sm font-medium text-center">
                   {error}
                 </p>
               )}
@@ -271,15 +262,14 @@ export default function LoginScreen() {
               {/* Resend */}
               <div className="text-center">
                 {resendTimer > 0 ? (
-                  <p className="text-white/40 text-sm" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                  <p className="text-gray-400 text-sm">
                     Resend code in{" "}
-                    <span className="text-[#00C9A7] font-mono">{resendTimer}s</span>
+                    <span className="text-[#1B2E4B] font-mono font-semibold">{resendTimer}s</span>
                   </p>
                 ) : (
                   <button
                     onClick={handleResend}
-                    className="text-[#00C9A7] text-sm font-semibold"
-                    style={{ fontFamily: "'Manrope', sans-serif" }}
+                    className="text-[#1B2E4B] text-sm font-semibold"
                   >
                     Resend Code
                   </button>
@@ -289,14 +279,13 @@ export default function LoginScreen() {
               <button
                 onClick={() => verifyOtp(otp.join(""))}
                 disabled={otp.some((d) => !d)}
-                className="w-full h-14 rounded-2xl bg-[#00C9A7] text-[#0D1B2A] font-bold text-base disabled:opacity-40 active:scale-[0.98] transition-all"
-                style={{ fontFamily: "'Manrope', sans-serif" }}
+                className="w-full h-14 rounded-2xl bg-[#1B2E4B] text-white font-semibold text-base disabled:opacity-40 active:scale-[0.98] transition-all shadow-lg shadow-[#1B2E4B]/20"
               >
                 Verify Code
               </button>
 
-              <p className="text-center text-white/30 text-xs" style={{ fontFamily: "'Manrope', sans-serif" }}>
-                Hint: use <span className="font-mono text-[#00C9A7]/60">123456</span> for demo
+              <p className="text-center text-gray-400 text-xs">
+                Hint: use <span className="font-mono text-[#1B2E4B]/60">123456</span> for demo
               </p>
             </motion.div>
           )}

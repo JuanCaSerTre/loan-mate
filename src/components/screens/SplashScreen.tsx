@@ -13,12 +13,10 @@ export default function SplashScreen() {
   }, [navigate]);
 
   return (
-    <div className="relative flex flex-col items-center justify-center h-full overflow-hidden bg-[#0D1B2A]">
-      {/* Radial mesh gradient */}
+    <div className="relative flex flex-col items-center justify-center h-full overflow-hidden bg-[#1B2E4B]">
+      {/* Subtle gradient accent */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-[#00C9A7] opacity-5 blur-3xl" />
-        <div className="absolute top-1/4 left-1/4 w-[300px] h-[300px] rounded-full bg-[#00C9A7] opacity-[0.03] blur-2xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] rounded-full bg-[#00C9A7] opacity-[0.04] blur-3xl" />
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-blue-400 opacity-10 blur-[100px]" />
       </div>
 
       <motion.div
@@ -34,20 +32,18 @@ export default function SplashScreen() {
           transition={{ delay: 0.2, duration: 0.5 }}
           className="relative"
         >
-          <div className="w-24 h-24 rounded-3xl bg-[#1A2B3C] border border-[#00C9A7]/30 flex items-center justify-center shadow-2xl shadow-[#00C9A7]/10">
+          <div className="w-20 h-20 rounded-full bg-white flex items-center justify-center shadow-2xl">
             <div className="relative">
               {/* Coin */}
-              <div className="w-10 h-10 rounded-full border-[3px] border-[#00C9A7] flex items-center justify-center">
-                <span className="text-[#00C9A7] font-bold text-lg font-mono">$</span>
+              <div className="w-10 h-10 rounded-full bg-[#1B2E4B] flex items-center justify-center">
+                <span className="text-white font-bold text-lg" style={{ fontFamily: "'JetBrains Mono', monospace" }}>$</span>
               </div>
-              {/* Handshake indicator */}
-              <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#00C9A7] flex items-center justify-center">
+              {/* Handshake */}
+              <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
                 <span className="text-[8px]">🤝</span>
               </div>
             </div>
           </div>
-          {/* Glow ring */}
-          <div className="absolute inset-0 rounded-3xl border border-[#00C9A7]/20 blur-sm" />
         </motion.div>
 
         {/* App name */}
@@ -57,10 +53,10 @@ export default function SplashScreen() {
           transition={{ delay: 0.4, duration: 0.5 }}
           className="text-center"
         >
-          <h1 className="text-5xl font-black text-white tracking-tight" style={{ fontFamily: "'Syne', sans-serif" }}>
-            Loan<span className="text-[#00C9A7]">Mate</span>
+          <h1 className="text-4xl font-extrabold text-white tracking-tight">
+            Loan<span className="text-emerald-400">Mate</span>
           </h1>
-          <p className="text-[#00C9A7]/70 text-sm mt-2 font-medium tracking-widest uppercase" style={{ fontFamily: "'Manrope', sans-serif" }}>
+          <p className="text-white/50 text-sm mt-2 font-medium">
             Loans between friends, made honest.
           </p>
         </motion.div>
@@ -75,7 +71,7 @@ export default function SplashScreen() {
           {[0, 1, 2].map((i) => (
             <motion.div
               key={i}
-              className="w-2 h-2 rounded-full bg-[#00C9A7]"
+              className="w-2 h-2 rounded-full bg-white/60"
               animate={{ opacity: [0.3, 1, 0.3] }}
               transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
             />

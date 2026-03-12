@@ -41,7 +41,7 @@ export const LOAN = {
 } as const;
 
 // ─── Navigation ──────────────────────────────────────────────────
-export const NAV_SCREENS = ["dashboard", "loans", "notifications", "profile"] as const;
+export const NAV_SCREENS = ["dashboard", "loans", "contacts", "notifications", "profile"] as const;
 
 export type AppScreen =
   | "splash"
@@ -54,6 +54,7 @@ export type AppScreen =
   | "loan-request"
   | "register-payment"
   | "notifications"
+  | "contacts"
   | "profile";
 
 // ─── Notification Types ──────────────────────────────────────────

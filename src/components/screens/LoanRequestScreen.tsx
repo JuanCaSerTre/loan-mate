@@ -9,22 +9,22 @@ export default function LoanRequestScreen() {
 
   if (!loan) {
     return (
-      <div className="flex flex-col h-full bg-[#0D1B2A] items-center justify-center">
-        <p className="text-white/40">Loan not found</p>
+      <div className="flex flex-col h-full bg-[#F8F9FB] items-center justify-center">
+        <p className="text-gray-400">Loan not found</p>
       </div>
     );
   }
 
   if (loan.status !== "pending") {
     return (
-      <div className="flex flex-col h-full bg-[#0D1B2A] items-center justify-center gap-3">
-        <p className="text-white/40">This loan is already {loan.status}</p>
+      <div className="flex flex-col h-full bg-[#F8F9FB] items-center justify-center gap-3">
+        <p className="text-gray-400">This loan is already {loan.status}</p>
         <button
           onClick={() => {
             selectLoan(loan.loan_id);
             navigate("loan-details");
           }}
-          className="text-[#00C9A7] text-sm font-semibold"
+          className="text-[#1B2E4B] text-sm font-semibold"
         >
           View Loan Details
         </button>
@@ -46,43 +46,43 @@ export default function LoanRequestScreen() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#0D1B2A] overflow-hidden">
+    <div className="flex flex-col h-full bg-[#F8F9FB] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 pt-12 pb-4">
-        <button onClick={() => navigate("dashboard")} className="w-10 h-10 rounded-2xl bg-[#1A2B3C] border border-white/5 flex items-center justify-center">
-          <ArrowLeft className="w-5 h-5 text-white/60" />
+      <div className="flex items-center gap-3 px-5 pt-12 pb-4 bg-white border-b border-gray-100">
+        <button onClick={() => navigate("dashboard")} className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+          <ArrowLeft className="w-5 h-5 text-gray-500" />
         </button>
-        <h2 className="text-white font-bold text-base flex-1" style={{ fontFamily: "'Syne', sans-serif" }}>
+        <h2 className="text-gray-900 font-bold text-base flex-1">
           Loan Request
         </h2>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 pb-6 space-y-4">
+      <div className="flex-1 overflow-y-auto px-5 pt-4 pb-6 space-y-4">
         {/* Lender info */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-[#1A2B3C] border border-[#FFB347]/20 rounded-3xl p-5"
+          className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm"
         >
           <div className="flex items-center gap-3 mb-4">
             <AvatarBadge initials={loan.lender_avatar || loan.lender_name.slice(0, 2)} size="lg" />
             <div>
-              <p className="text-white/40 text-xs" style={{ fontFamily: "'Manrope', sans-serif" }}>Loan request from</p>
-              <p className="text-white font-bold text-lg" style={{ fontFamily: "'Syne', sans-serif" }}>{lender}</p>
+              <p className="text-gray-400 text-xs">Loan request from</p>
+              <p className="text-gray-900 font-bold text-lg">{lender}</p>
             </div>
-            <div className="ml-auto px-3 py-1 rounded-full bg-[#FFB347]/10 border border-[#FFB347]/30">
-              <span className="text-[#FFB347] text-xs font-semibold" style={{ fontFamily: "'Manrope', sans-serif" }}>Pending</span>
+            <div className="ml-auto px-3 py-1 rounded-full bg-amber-50 border border-amber-200">
+              <span className="text-amber-700 text-xs font-semibold">Pending</span>
             </div>
           </div>
 
           {/* Amount */}
-          <div className="bg-[#0D1B2A]/40 rounded-2xl p-4 text-center mb-4">
-            <p className="text-white/40 text-xs mb-1" style={{ fontFamily: "'Manrope', sans-serif" }}>Loan Amount</p>
-            <p className="text-[#00C9A7] text-4xl font-black" style={{ fontFamily: "'Syne', sans-serif" }}>
+          <div className="bg-[#F8F9FB] rounded-2xl p-4 text-center mb-4">
+            <p className="text-gray-400 text-xs mb-1">Loan Amount</p>
+            <p className="text-[#1B2E4B] text-4xl font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
               ${loan.loan_amount.toLocaleString()}
             </p>
             {loan.interest_rate > 0 && (
-              <p className="text-white/30 text-xs mt-1" style={{ fontFamily: "'Manrope', sans-serif" }}>
+              <p className="text-gray-400 text-xs mt-1">
                 Total with {loan.interest_rate}% interest: ${loan.total_amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
               </p>
             )}
@@ -97,8 +97,8 @@ export default function LoanRequestScreen() {
               { label: "Due Date", value: new Date(loan.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) },
             ].map(({ label, value }) => (
               <div key={label} className="flex justify-between">
-                <span className="text-white/40 text-sm" style={{ fontFamily: "'Manrope', sans-serif" }}>{label}</span>
-                <span className="text-white font-semibold text-sm" style={{ fontFamily: "'Manrope', sans-serif" }}>{value}</span>
+                <span className="text-gray-400 text-sm">{label}</span>
+                <span className="text-gray-900 font-semibold text-sm">{value}</span>
               </div>
             ))}
           </div>
@@ -108,8 +108,7 @@ export default function LoanRequestScreen() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className="text-white/30 text-xs text-center"
-          style={{ fontFamily: "'Manrope', sans-serif" }}
+          className="text-gray-400 text-xs text-center"
         >
           By accepting, you agree to repay this loan according to the terms above
         </motion.p>
@@ -120,20 +119,18 @@ export default function LoanRequestScreen() {
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.3 }}
-        className="px-5 pb-6 flex gap-3"
+        className="px-5 pb-6 flex gap-3 bg-white pt-4 border-t border-gray-100"
       >
         <button
           onClick={handleDecline}
-          className="flex-1 h-14 rounded-2xl bg-[#1A2B3C] border border-[#FF6B6B]/30 text-[#FF6B6B] font-bold text-base flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
-          style={{ fontFamily: "'Manrope', sans-serif" }}
+          className="flex-1 h-14 rounded-2xl bg-white border border-red-200 text-red-500 font-semibold text-base flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
         >
           <X className="w-5 h-5" />
           Decline
         </button>
         <button
           onClick={handleAccept}
-          className="flex-1 h-14 rounded-2xl bg-[#00C9A7] text-[#0D1B2A] font-bold text-base flex items-center justify-center gap-2 active:scale-[0.98] transition-transform shadow-lg shadow-[#00C9A7]/20"
-          style={{ fontFamily: "'Manrope', sans-serif" }}
+          className="flex-1 h-14 rounded-2xl bg-[#1B2E4B] text-white font-semibold text-base flex items-center justify-center gap-2 active:scale-[0.98] transition-transform shadow-lg shadow-[#1B2E4B]/20"
         >
           <Check className="w-5 h-5" strokeWidth={2.5} />
           Accept Loan

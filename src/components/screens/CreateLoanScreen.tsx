@@ -1,16 +1,18 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Search, Check } from "lucide-react";
+import { X, Search, Check, BookUser, ChevronRight, Users, CalendarDays, TrendingUp, Wallet, Clock } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { PaymentFrequency } from "@/types/loan";
 import AvatarBadge from "@/components/shared/AvatarBadge";
-import { calculateTotalAmount, calculateDueDate } from "@/lib/calculations";
+import { calculateTotalAmount, calculateDueDate, generatePaymentSchedule } from "@/lib/calculations";
+import { useContacts } from "@/hooks/useContacts";
+import { LoanMateFriend } from "@/types/contact";
 import { toast } from "sonner";
 
 type Step = 1 | 2 | 3;
 
 export default function CreateLoanScreen() {
-  const { navigate, currentUser, findUserByPhone, createLoan } = useApp();
+  const { navigate, currentUser, findUserByPhone, createLoan, users } = useApp();
   const [step, setStep] = useState<Step>(1);
   const [borrowerPhone, setBorrowerPhone] = useState("");
   const [foundUser, setFoundUser] = useState<ReturnType<typeof findUserByPhone>>(undefined);
@@ -20,6 +22,19 @@ export default function CreateLoanScreen() {
   const [numPayments, setNumPayments] = useState("3");
   const [frequency, setFrequency] = useState<PaymentFrequency>("monthly");
   const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
+  const [showContactPicker, setShowContactPicker] = useState(false);
+  const [showSchedule, setShowSchedule] = useState(false);
+
+  // Contact syncing for the inline contact picker
+  const {
+    permissionStatus: contactPermission,
+    isLoaded: contactsLoaded,
+    isSyncing: contactsSyncing,
+    requestPermissionAndSync: syncContacts,
+    filteredFriends: contactFriends,
+    searchQuery: contactSearch,
+    setSearchQuery: setContactSearch,
+  } = useContacts(users, currentUser?.id || "");
 
   const frequencies: { id: PaymentFrequency; label: string }[] = [
     { id: "weekly", label: "Weekly" },
@@ -27,21 +42,38 @@ export default function CreateLoanScreen() {
     { id: "monthly", label: "Monthly" },
   ];
 
-  const getDueDate = () => {
-    return calculateDueDate(startDate, parseInt(numPayments) || 1, frequency);
-  };
+  // Live calculation values derived from inputs
+  const parsedAmount = parseFloat(amount) || 0;
+  const parsedRate = parseFloat(interestRate) || 0;
+  const parsedPayments = Math.max(1, parseInt(numPayments) || 1);
 
-  const totalAmount = () => {
-    const a = parseFloat(amount) || 0;
-    const r = parseFloat(interestRate) || 0;
-    return calculateTotalAmount(a, r);
-  };
+  const totalAmount = useMemo(() => {
+    if (parsedAmount <= 0) return 0;
+    return calculateTotalAmount(parsedAmount, parsedRate);
+  }, [parsedAmount, parsedRate]);
 
-  const perPayment = () => {
-    const total = totalAmount();
-    const n = parseInt(numPayments) || 1;
-    return Math.round((total / n) * 100) / 100;
-  };
+  const interestAmount = useMemo(() => Math.round((totalAmount - parsedAmount) * 100) / 100, [totalAmount, parsedAmount]);
+
+  const perPayment = useMemo(() => {
+    if (totalAmount <= 0 || parsedPayments <= 0) return 0;
+    return Math.round((totalAmount / parsedPayments) * 100) / 100;
+  }, [totalAmount, parsedPayments]);
+
+  const dueDate = useMemo(() => {
+    return calculateDueDate(startDate, parsedPayments, frequency);
+  }, [startDate, parsedPayments, frequency]);
+
+  const nextPaymentDate = useMemo(() => {
+    const daysPerPeriod = frequency === "weekly" ? 7 : frequency === "biweekly" ? 14 : 30;
+    const start = new Date(startDate);
+    const next = new Date(start.getTime() + daysPerPeriod * 24 * 60 * 60 * 1000);
+    return next.toISOString().split("T")[0];
+  }, [startDate, frequency]);
+
+  const paymentSchedule = useMemo(() => {
+    if (parsedAmount <= 0 || parsedPayments <= 0) return [];
+    return generatePaymentSchedule(parsedAmount, parsedRate, parsedPayments, frequency, startDate);
+  }, [parsedAmount, parsedRate, parsedPayments, frequency, startDate]);
 
   const handleFindBorrower = () => {
     if (!borrowerPhone.trim()) {
@@ -63,9 +95,18 @@ export default function CreateLoanScreen() {
     setSearchError("");
   };
 
+  const handleSelectContact = (friend: LoanMateFriend) => {
+    const user = findUserByPhone(friend.userPhone);
+    if (user) {
+      setFoundUser(user);
+      setBorrowerPhone(friend.userPhone);
+      setSearchError("");
+      setShowContactPicker(false);
+    }
+  };
+
   const handleSubmit = () => {
     if (!foundUser || !currentUser) return;
-    const parsedAmount = parseFloat(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
       toast.error("Invalid loan amount");
       return;
@@ -74,57 +115,51 @@ export default function CreateLoanScreen() {
     createLoan({
       borrower: foundUser,
       amount: parsedAmount,
-      interestRate: parseFloat(interestRate) || 0,
-      numberOfPayments: parseInt(numPayments) || 1,
+      interestRate: parsedRate,
+      numberOfPayments: parsedPayments,
       paymentFrequency: frequency,
       startDate: startDate,
-      dueDate: getDueDate(),
+      dueDate: dueDate,
     });
 
     toast.success("Loan request sent!", {
       description: `$${parsedAmount.toLocaleString()} to ${foundUser.name}`,
-      style: {
-        background: "#1A2B3C",
-        border: "1px solid rgba(0,201,167,0.3)",
-        color: "#fff",
-      },
     });
 
     navigate("dashboard");
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#0D1B2A] overflow-hidden">
+    <div className="flex flex-col h-full bg-[#F8F9FB] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-12 pb-4">
-        <button onClick={() => navigate("dashboard")} className="w-10 h-10 rounded-2xl bg-[#1A2B3C] border border-white/5 flex items-center justify-center">
-          <X className="w-5 h-5 text-white/60" />
+      <div className="flex items-center justify-between px-5 pt-12 pb-4 bg-white border-b border-gray-100">
+        <button onClick={() => navigate("dashboard")} className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+          <X className="w-5 h-5 text-gray-500" />
         </button>
-        <h2 className="text-white font-bold text-base" style={{ fontFamily: "'Syne', sans-serif" }}>
+        <h2 className="text-gray-900 font-bold text-base">
           New Loan
         </h2>
         <div className="w-10" />
       </div>
 
       {/* Step indicator */}
-      <div className="px-5 mb-4">
+      <div className="px-5 py-4 bg-white">
         <div className="flex items-center gap-2">
           {[1, 2, 3].map((s) => (
             <div key={s} className="flex items-center gap-2 flex-1">
               <div
                 className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                   step > s
-                    ? "bg-[#00C9A7] text-[#0D1B2A]"
+                    ? "bg-emerald-500 text-white"
                     : step === s
-                    ? "bg-[#00C9A7] text-[#0D1B2A]"
-                    : "bg-[#1A2B3C] text-white/30 border border-white/10"
+                    ? "bg-[#1B2E4B] text-white"
+                    : "bg-gray-100 text-gray-400"
                 }`}
-                style={{ fontFamily: "'Manrope', sans-serif" }}
               >
                 {step > s ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : s}
               </div>
               {s < 3 && (
-                <div className={`h-0.5 flex-1 rounded-full transition-all ${step > s ? "bg-[#00C9A7]" : "bg-white/10"}`} />
+                <div className={`h-0.5 flex-1 rounded-full transition-all ${step > s ? "bg-emerald-500" : "bg-gray-200"}`} />
               )}
             </div>
           ))}
@@ -133,8 +168,7 @@ export default function CreateLoanScreen() {
           {["Borrower", "Terms", "Review"].map((label, i) => (
             <span
               key={i}
-              className={`text-[10px] font-semibold ${step === i + 1 ? "text-[#00C9A7]" : "text-white/30"}`}
-              style={{ fontFamily: "'Manrope', sans-serif" }}
+              className={`text-[10px] font-semibold ${step === i + 1 ? "text-[#1B2E4B]" : "text-gray-400"}`}
             >
               {label}
             </span>
@@ -143,7 +177,7 @@ export default function CreateLoanScreen() {
       </div>
 
       {/* Steps */}
-      <div className="flex-1 overflow-y-auto px-5 pb-6">
+      <div className="flex-1 overflow-y-auto px-5 pb-6 pt-4">
         <AnimatePresence mode="wait">
           {step === 1 && (
             <motion.div
@@ -155,8 +189,101 @@ export default function CreateLoanScreen() {
               className="flex flex-col gap-4"
             >
               <div>
-                <h3 className="text-white text-lg font-black mb-1" style={{ fontFamily: "'Syne', sans-serif" }}>Who are you lending to?</h3>
-                <p className="text-white/40 text-sm" style={{ fontFamily: "'Manrope', sans-serif" }}>Enter their phone number</p>
+                <h3 className="text-gray-900 text-lg font-bold mb-1">Who are you lending to?</h3>
+                <p className="text-gray-500 text-sm">Enter their phone number or pick a contact</p>
+              </div>
+
+              {/* Pick from contacts button */}
+              <button
+                onClick={() => {
+                  if (contactPermission !== "granted") {
+                    syncContacts();
+                  }
+                  setShowContactPicker(!showContactPicker);
+                }}
+                className="flex items-center gap-3 bg-white border border-gray-200 rounded-2xl px-4 py-3 hover:bg-gray-50 active:scale-[0.98] transition-all"
+              >
+                <div className="w-10 h-10 rounded-xl bg-[#1B2E4B]/5 flex items-center justify-center">
+                  <BookUser className="w-5 h-5 text-[#1B2E4B]" />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="text-gray-900 text-sm font-semibold">Pick from Contacts</p>
+                  <p className="text-gray-400 text-xs">
+                    {contactsLoaded
+                      ? `${contactFriends.length} friend${contactFriends.length !== 1 ? "s" : ""} on LoanMate`
+                      : "Sync contacts to find friends"}
+                  </p>
+                </div>
+                <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${showContactPicker ? "rotate-90" : ""}`} />
+              </button>
+
+              {/* Inline Contact Picker */}
+              <AnimatePresence>
+                {showContactPicker && contactPermission === "granted" && contactsLoaded && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+                      {/* Search within contacts */}
+                      <div className="p-3 border-b border-gray-100">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <input
+                            type="text"
+                            value={contactSearch}
+                            onChange={(e) => setContactSearch(e.target.value)}
+                            placeholder="Search contacts..."
+                            className="w-full h-10 pl-9 pr-3 rounded-xl bg-gray-50 border border-gray-100 text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:border-[#1B2E4B]/30"
+                          />
+                        </div>
+                      </div>
+                      {/* Contact list */}
+                      <div className="max-h-48 overflow-y-auto">
+                        {contactFriends.length === 0 ? (
+                          <div className="flex flex-col items-center py-6">
+                            <Users className="w-6 h-6 text-gray-300 mb-2" />
+                            <p className="text-gray-400 text-xs">
+                              {contactSearch ? "No matches" : "No LoanMate friends found"}
+                            </p>
+                          </div>
+                        ) : (
+                          contactFriends.map((friend) => (
+                            <button
+                              key={friend.userId}
+                              onClick={() => handleSelectContact(friend)}
+                              className="flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0"
+                            >
+                              <AvatarBadge
+                                initials={friend.userAvatar || friend.userName.slice(0, 2)}
+                                size="sm"
+                              />
+                              <div className="flex-1 text-left min-w-0">
+                                <p className="text-gray-900 text-sm font-semibold truncate">
+                                  {friend.userName}
+                                </p>
+                                <p className="text-gray-400 text-[11px] truncate">
+                                  {friend.contact.name} · {friend.contact.phoneNumbers[0]}
+                                </p>
+                              </div>
+                              <Check className="w-4 h-4 text-emerald-500 opacity-0 group-hover:opacity-100" />
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Divider */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-gray-200" />
+                <span className="text-gray-400 text-xs font-medium">or enter phone number</span>
+                <div className="flex-1 h-px bg-gray-200" />
               </div>
 
               <div className="flex gap-2">
@@ -169,24 +296,23 @@ export default function CreateLoanScreen() {
                     setSearchError("");
                     setFoundUser(undefined);
                   }}
-                  className="flex-1 h-14 px-4 rounded-2xl bg-[#1A2B3C] border border-white/10 text-white placeholder-white/30 text-sm focus:outline-none focus:border-[#00C9A7]/50"
-                  style={{ fontFamily: "'Manrope', sans-serif" }}
+                  className="flex-1 h-14 px-4 rounded-2xl bg-white border border-gray-200 text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:border-[#1B2E4B] focus:ring-1 focus:ring-[#1B2E4B]/20"
                 />
                 <button
                   onClick={handleFindBorrower}
-                  className="h-14 w-14 rounded-2xl bg-[#00C9A7] flex items-center justify-center flex-shrink-0"
+                  className="h-14 w-14 rounded-2xl bg-[#1B2E4B] flex items-center justify-center flex-shrink-0"
                 >
-                  <Search className="w-5 h-5 text-[#0D1B2A]" />
+                  <Search className="w-5 h-5 text-white" />
                 </button>
               </div>
 
               {searchError && (
-                <p className="text-[#FF6B6B] text-sm" style={{ fontFamily: "'Manrope', sans-serif" }}>{searchError}</p>
+                <p className="text-red-500 text-sm">{searchError}</p>
               )}
 
               {/* Demo numbers hint */}
-              <div className="bg-[#1A2B3C]/60 border border-white/5 rounded-2xl p-3">
-                <p className="text-white/30 text-xs mb-2 font-semibold" style={{ fontFamily: "'Manrope', sans-serif" }}>Demo contacts:</p>
+              <div className="bg-white border border-gray-100 rounded-2xl p-3 shadow-sm">
+                <p className="text-gray-400 text-xs mb-2 font-semibold">Demo contacts:</p>
                 <div className="space-y-1">
                   {[
                     { name: "Maria Garcia", phone: "5559876543" },
@@ -200,10 +326,10 @@ export default function CreateLoanScreen() {
                         setSearchError("");
                         setFoundUser(undefined);
                       }}
-                      className="flex items-center justify-between w-full text-left"
+                      className="flex items-center justify-between w-full text-left py-1"
                     >
-                      <span className="text-white/50 text-xs" style={{ fontFamily: "'Manrope', sans-serif" }}>{c.name}</span>
-                      <span className="text-[#00C9A7]/60 text-xs font-mono">{c.phone}</span>
+                      <span className="text-gray-600 text-xs">{c.name}</span>
+                      <span className="text-gray-400 text-xs font-mono">{c.phone}</span>
                     </button>
                   ))}
                 </div>
@@ -213,22 +339,21 @@ export default function CreateLoanScreen() {
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="flex items-center gap-3 bg-[#00C9A7]/10 border border-[#00C9A7]/30 rounded-2xl p-4"
+                  className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-2xl p-4"
                 >
                   <AvatarBadge initials={foundUser.avatar || foundUser.name.slice(0, 2)} size="md" />
                   <div>
-                    <p className="text-white font-semibold text-sm" style={{ fontFamily: "'Manrope', sans-serif" }}>{foundUser.name}</p>
-                    <p className="text-white/40 text-xs" style={{ fontFamily: "'Manrope', sans-serif" }}>{foundUser.phone_number}</p>
+                    <p className="text-gray-900 font-semibold text-sm">{foundUser.name}</p>
+                    <p className="text-gray-500 text-xs">{foundUser.phone_number}</p>
                   </div>
-                  <Check className="w-5 h-5 text-[#00C9A7] ml-auto" />
+                  <Check className="w-5 h-5 text-emerald-500 ml-auto" />
                 </motion.div>
               )}
 
               <button
                 onClick={() => foundUser && setStep(2)}
                 disabled={!foundUser}
-                className="w-full h-14 rounded-2xl bg-[#00C9A7] text-[#0D1B2A] font-bold text-base disabled:opacity-30 active:scale-[0.98] transition-all mt-4"
-                style={{ fontFamily: "'Manrope', sans-serif" }}
+                className="w-full h-14 rounded-2xl bg-[#1B2E4B] text-white font-semibold text-base disabled:opacity-30 active:scale-[0.98] transition-all mt-4 shadow-lg shadow-[#1B2E4B]/20"
               >
                 Continue
               </button>
@@ -245,23 +370,23 @@ export default function CreateLoanScreen() {
               className="flex flex-col gap-5"
             >
               <div>
-                <h3 className="text-white text-lg font-black mb-1" style={{ fontFamily: "'Syne', sans-serif" }}>Loan Terms</h3>
-                <p className="text-white/40 text-sm" style={{ fontFamily: "'Manrope', sans-serif" }}>Set the terms for this loan</p>
+                <h3 className="text-gray-900 text-lg font-bold mb-1">Loan Terms</h3>
+                <p className="text-gray-500 text-sm">Set the terms for this loan</p>
               </div>
 
               {/* Amount */}
               <div>
-                <label className="text-white/50 text-xs font-semibold uppercase tracking-wider block mb-2" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                <label className="text-gray-500 text-xs font-semibold uppercase tracking-wider block mb-2">
                   Loan Amount *
                 </label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#00C9A7] font-bold text-lg" style={{ fontFamily: "'JetBrains Mono', monospace" }}>$</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#1B2E4B] font-bold text-lg" style={{ fontFamily: "'JetBrains Mono', monospace" }}>$</span>
                   <input
                     type="number"
                     placeholder="0.00"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    className="w-full h-14 pl-10 pr-4 rounded-2xl bg-[#1A2B3C] border border-white/10 text-white text-xl font-black focus:outline-none focus:border-[#00C9A7]/50"
+                    className="w-full h-14 pl-10 pr-4 rounded-2xl bg-white border border-gray-200 text-gray-900 text-xl font-bold focus:outline-none focus:border-[#1B2E4B] focus:ring-1 focus:ring-[#1B2E4B]/20"
                     style={{ fontFamily: "'JetBrains Mono', monospace" }}
                   />
                 </div>
@@ -269,7 +394,7 @@ export default function CreateLoanScreen() {
 
               {/* Interest rate */}
               <div>
-                <label className="text-white/50 text-xs font-semibold uppercase tracking-wider block mb-2" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                <label className="text-gray-500 text-xs font-semibold uppercase tracking-wider block mb-2">
                   Interest Rate (Optional)
                 </label>
                 <div className="relative">
@@ -278,16 +403,15 @@ export default function CreateLoanScreen() {
                     placeholder="0"
                     value={interestRate}
                     onChange={(e) => setInterestRate(e.target.value)}
-                    className="w-full h-14 px-4 pr-10 rounded-2xl bg-[#1A2B3C] border border-white/10 text-white text-base focus:outline-none focus:border-[#00C9A7]/50"
-                    style={{ fontFamily: "'Manrope', sans-serif" }}
+                    className="w-full h-14 px-4 pr-10 rounded-2xl bg-white border border-gray-200 text-gray-900 text-base focus:outline-none focus:border-[#1B2E4B] focus:ring-1 focus:ring-[#1B2E4B]/20"
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 font-semibold">%</span>
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">%</span>
                 </div>
               </div>
 
               {/* Number of payments */}
               <div>
-                <label className="text-white/50 text-xs font-semibold uppercase tracking-wider block mb-2" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                <label className="text-gray-500 text-xs font-semibold uppercase tracking-wider block mb-2">
                   Number of Payments
                 </label>
                 <input
@@ -295,14 +419,13 @@ export default function CreateLoanScreen() {
                   value={numPayments}
                   onChange={(e) => setNumPayments(e.target.value)}
                   min="1"
-                  className="w-full h-14 px-4 rounded-2xl bg-[#1A2B3C] border border-white/10 text-white text-base focus:outline-none focus:border-[#00C9A7]/50"
-                  style={{ fontFamily: "'Manrope', sans-serif" }}
+                  className="w-full h-14 px-4 rounded-2xl bg-white border border-gray-200 text-gray-900 text-base focus:outline-none focus:border-[#1B2E4B] focus:ring-1 focus:ring-[#1B2E4B]/20"
                 />
               </div>
 
               {/* Frequency */}
               <div>
-                <label className="text-white/50 text-xs font-semibold uppercase tracking-wider block mb-2" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                <label className="text-gray-500 text-xs font-semibold uppercase tracking-wider block mb-2">
                   Payment Frequency
                 </label>
                 <div className="grid grid-cols-3 gap-2">
@@ -312,10 +435,9 @@ export default function CreateLoanScreen() {
                       onClick={() => setFrequency(f.id)}
                       className={`h-12 rounded-2xl text-sm font-semibold transition-all ${
                         frequency === f.id
-                          ? "bg-[#00C9A7] text-[#0D1B2A]"
-                          : "bg-[#1A2B3C] text-white/50 border border-white/10"
+                          ? "bg-[#1B2E4B] text-white"
+                          : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
                       }`}
-                      style={{ fontFamily: "'Manrope', sans-serif" }}
                     >
                       {f.label}
                     </button>
@@ -325,59 +447,109 @@ export default function CreateLoanScreen() {
 
               {/* Start date */}
               <div>
-                <label className="text-white/50 text-xs font-semibold uppercase tracking-wider block mb-2" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                <label className="text-gray-500 text-xs font-semibold uppercase tracking-wider block mb-2">
                   Start Date
                 </label>
                 <input
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full h-14 px-4 rounded-2xl bg-[#1A2B3C] border border-white/10 text-white text-base focus:outline-none focus:border-[#00C9A7]/50 [color-scheme:dark]"
-                  style={{ fontFamily: "'Manrope', sans-serif" }}
+                  className="w-full h-14 px-4 rounded-2xl bg-white border border-gray-200 text-gray-900 text-base focus:outline-none focus:border-[#1B2E4B] focus:ring-1 focus:ring-[#1B2E4B]/20"
                 />
               </div>
 
-              {/* Auto-calculated summary */}
-              {amount && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  className="bg-[#00C9A7]/5 border border-[#00C9A7]/10 rounded-2xl p-3 space-y-1"
-                >
-                  <div className="flex justify-between">
-                    <span className="text-white/40 text-xs" style={{ fontFamily: "'Manrope', sans-serif" }}>Total Repayment</span>
-                    <span className="text-[#00C9A7] text-xs font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                      ${totalAmount().toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-white/40 text-xs" style={{ fontFamily: "'Manrope', sans-serif" }}>Per Payment</span>
-                    <span className="text-white/70 text-xs font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                      ${perPayment().toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-white/40 text-xs" style={{ fontFamily: "'Manrope', sans-serif" }}>Due Date</span>
-                    <span className="text-white/70 text-xs font-semibold" style={{ fontFamily: "'Manrope', sans-serif" }}>
-                      {new Date(getDueDate()).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                    </span>
-                  </div>
-                </motion.div>
-              )}
+              {/* Live Repayment Summary — always show when amount entered */}
+              <AnimatePresence>
+                {parsedAmount > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 8 }}
+                    transition={{ duration: 0.2 }}
+                    className="bg-[#1B2E4B] rounded-2xl p-4 space-y-3"
+                  >
+                    <p className="text-white/60 text-[10px] font-semibold uppercase tracking-wider">
+                      Live Repayment Summary
+                    </p>
+
+                    {/* Main amounts row */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-white/10 rounded-xl p-3">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Wallet className="w-3 h-3 text-white/50" />
+                          <p className="text-white/50 text-[10px] font-semibold uppercase tracking-wider">Total Repayment</p>
+                        </div>
+                        <p className="text-white text-lg font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                          ${totalAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div className="bg-white/10 rounded-xl p-3">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <CalendarDays className="w-3 h-3 text-white/50" />
+                          <p className="text-white/50 text-[10px] font-semibold uppercase tracking-wider">Per Payment</p>
+                        </div>
+                        <p className="text-white text-lg font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                          ${perPayment.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Breakdown rows */}
+                    <div className="space-y-2 border-t border-white/10 pt-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-white/50 text-xs">Principal</span>
+                        <span className="text-white/80 text-xs font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                          ${parsedAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      {parsedRate > 0 && (
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-1">
+                            <TrendingUp className="w-3 h-3 text-amber-400" />
+                            <span className="text-amber-400 text-xs">Interest ({parsedRate}%)</span>
+                          </div>
+                          <span className="text-amber-400 text-xs font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                            +${interestAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center">
+                        <span className="text-white/50 text-xs">Schedule</span>
+                        <span className="text-white/80 text-xs font-semibold">
+                          {parsedPayments} × {frequency}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-emerald-400" />
+                          <span className="text-emerald-400 text-xs">First Payment</span>
+                        </div>
+                        <span className="text-emerald-400 text-xs font-semibold">
+                          {new Date(nextPaymentDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-white/50 text-xs">Final Due Date</span>
+                        <span className="text-white/80 text-xs font-semibold">
+                          {new Date(dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               <div className="flex gap-3 mt-2">
                 <button
                   onClick={() => setStep(1)}
-                  className="flex-1 h-14 rounded-2xl bg-[#1A2B3C] border border-white/10 text-white font-semibold text-base"
-                  style={{ fontFamily: "'Manrope', sans-serif" }}
+                  className="flex-1 h-14 rounded-2xl bg-white border border-gray-200 text-gray-700 font-semibold text-base"
                 >
                   Back
                 </button>
                 <button
                   onClick={() => amount && setStep(3)}
                   disabled={!amount}
-                  className="flex-1 h-14 rounded-2xl bg-[#00C9A7] text-[#0D1B2A] font-bold text-base disabled:opacity-30"
-                  style={{ fontFamily: "'Manrope', sans-serif" }}
+                  className="flex-1 h-14 rounded-2xl bg-[#1B2E4B] text-white font-semibold text-base disabled:opacity-30"
                 >
                   Review
                 </button>
@@ -395,67 +567,140 @@ export default function CreateLoanScreen() {
               className="flex flex-col gap-4"
             >
               <div>
-                <h3 className="text-white text-lg font-black mb-1" style={{ fontFamily: "'Syne', sans-serif" }}>Review & Send</h3>
-                <p className="text-white/40 text-sm" style={{ fontFamily: "'Manrope', sans-serif" }}>Confirm the loan details</p>
+                <h3 className="text-gray-900 text-lg font-bold mb-1">Review & Send</h3>
+                <p className="text-gray-500 text-sm">Confirm the loan details before sending</p>
               </div>
 
               {/* Summary card */}
-              <div className="bg-[#1A2B3C] border border-white/10 rounded-3xl p-5 space-y-4">
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 space-y-4 shadow-sm">
                 {/* Parties */}
                 <div className="flex items-center gap-3">
                   <AvatarBadge initials={currentUser?.avatar || "U"} size="md" />
                   <div className="flex-1">
-                    <p className="text-white/40 text-[10px] uppercase tracking-wider" style={{ fontFamily: "'Manrope', sans-serif" }}>Lender (You)</p>
-                    <p className="text-white font-semibold text-sm" style={{ fontFamily: "'Manrope', sans-serif" }}>{currentUser?.name}</p>
+                    <p className="text-gray-400 text-[10px] uppercase tracking-wider">Lender (You)</p>
+                    <p className="text-gray-900 font-semibold text-sm">{currentUser?.name}</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3">
                   <AvatarBadge initials={foundUser?.avatar || "?"} size="md" />
                   <div className="flex-1">
-                    <p className="text-white/40 text-[10px] uppercase tracking-wider" style={{ fontFamily: "'Manrope', sans-serif" }}>Borrower</p>
-                    <p className="text-white font-semibold text-sm" style={{ fontFamily: "'Manrope', sans-serif" }}>{foundUser?.name}</p>
+                    <p className="text-gray-400 text-[10px] uppercase tracking-wider">Borrower</p>
+                    <p className="text-gray-900 font-semibold text-sm">{foundUser?.name}</p>
                   </div>
                 </div>
 
-                <div className="border-t border-white/5 pt-4 space-y-3">
+                {/* Repayment highlight */}
+                <div className="bg-[#1B2E4B] rounded-2xl p-4">
+                  <p className="text-white/50 text-[10px] font-semibold uppercase tracking-wider mb-3">Repayment Summary</p>
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    <div className="text-center">
+                      <p className="text-white/50 text-[10px] mb-1">Principal</p>
+                      <p className="text-white font-bold text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                        ${parsedAmount.toLocaleString("en-US", { minimumFractionDigits: 0 })}
+                      </p>
+                    </div>
+                    {parsedRate > 0 && (
+                      <div className="text-center">
+                        <p className="text-amber-400/70 text-[10px] mb-1">Interest</p>
+                        <p className="text-amber-400 font-bold text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                          +${interestAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    )}
+                    <div className={parsedRate > 0 ? "text-center" : "text-center col-span-2"}>
+                      <p className="text-emerald-400/70 text-[10px] mb-1">Total</p>
+                      <p className="text-emerald-400 font-bold text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                        ${totalAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center gap-2 bg-white/10 rounded-xl py-2.5">
+                    <span className="text-white/70 text-xs font-semibold">{parsedPayments} payments of</span>
+                    <span className="text-white font-bold text-base" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                      ${perPayment.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-white/50 text-xs">/ {frequency}</span>
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-100 pt-3 space-y-2.5">
                   {[
-                    { label: "Loan Amount", value: `$${parseFloat(amount).toLocaleString()}` },
-                    { label: "Interest Rate", value: interestRate ? `${interestRate}%` : "0% (no interest)" },
-                    { label: "Total Amount", value: `$${totalAmount().toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
-                    { label: "Payments", value: `${numPayments} × ${frequency}` },
-                    { label: "Per Payment", value: `$${perPayment().toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
                     { label: "Start Date", value: new Date(startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) },
-                    { label: "Due Date", value: new Date(getDueDate()).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) },
+                    { label: "First Payment", value: new Date(nextPaymentDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) },
+                    { label: "Final Due Date", value: new Date(dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) },
                   ].map(({ label, value }) => (
                     <div key={label} className="flex justify-between">
-                      <span className="text-white/40 text-sm" style={{ fontFamily: "'Manrope', sans-serif" }}>{label}</span>
-                      <span className="text-white font-semibold text-sm" style={{ fontFamily: "'Manrope', sans-serif" }}>{value}</span>
+                      <span className="text-gray-400 text-sm">{label}</span>
+                      <span className="text-gray-900 font-semibold text-sm">{value}</span>
                     </div>
                   ))}
                 </div>
+              </div>
 
-                {/* Total highlight */}
-                <div className="bg-[#00C9A7]/10 border border-[#00C9A7]/20 rounded-2xl p-3 flex justify-between items-center">
-                  <span className="text-[#00C9A7] font-semibold text-sm" style={{ fontFamily: "'Manrope', sans-serif" }}>Total to Repay</span>
-                  <span className="text-[#00C9A7] text-xl font-black" style={{ fontFamily: "'Syne', sans-serif" }}>
-                    ${totalAmount().toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
+              {/* Payment Schedule */}
+              <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+                <button
+                  onClick={() => setShowSchedule(!showSchedule)}
+                  className="w-full flex items-center justify-between px-5 py-4"
+                >
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="w-4 h-4 text-[#1B2E4B]" />
+                    <span className="text-gray-900 font-semibold text-sm">Payment Schedule</span>
+                    <span className="bg-[#1B2E4B]/10 text-[#1B2E4B] text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      {paymentSchedule.length} payments
+                    </span>
+                  </div>
+                  <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${showSchedule ? "rotate-90" : ""}`} />
+                </button>
+
+                <AnimatePresence>
+                  {showSchedule && (
+                    <motion.div
+                      initial={{ height: 0 }}
+                      animate={{ height: "auto" }}
+                      exit={{ height: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="border-t border-gray-100 max-h-64 overflow-y-auto">
+                        {paymentSchedule.map((p, i) => (
+                          <div
+                            key={p.paymentNumber}
+                            className="flex items-center px-5 py-3 border-b border-gray-50 last:border-0"
+                          >
+                            <div className="w-6 h-6 rounded-full bg-[#1B2E4B]/10 flex items-center justify-center mr-3 flex-shrink-0">
+                              <span className="text-[#1B2E4B] text-[10px] font-bold">{p.paymentNumber}</span>
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-gray-900 text-xs font-semibold">
+                                {new Date(p.dueDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                              </p>
+                              <p className="text-gray-400 text-[10px]">
+                                {i === 0 ? "First payment" : i === paymentSchedule.length - 1 ? "Final payment" : `Payment ${p.paymentNumber}`}
+                              </p>
+                            </div>
+                            <span className="text-[#1B2E4B] font-bold text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                              ${p.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               <div className="flex gap-3">
                 <button
                   onClick={() => setStep(2)}
-                  className="flex-1 h-14 rounded-2xl bg-[#1A2B3C] border border-white/10 text-white font-semibold text-base"
-                  style={{ fontFamily: "'Manrope', sans-serif" }}
+                  className="flex-1 h-14 rounded-2xl bg-white border border-gray-200 text-gray-700 font-semibold text-base"
                 >
                   Edit
                 </button>
                 <button
                   onClick={handleSubmit}
-                  className="flex-1 h-14 rounded-2xl bg-[#00C9A7] text-[#0D1B2A] font-bold text-base active:scale-[0.98] transition-transform shadow-lg shadow-[#00C9A7]/20"
-                  style={{ fontFamily: "'Manrope', sans-serif" }}
+                  className="flex-1 h-14 rounded-2xl bg-[#1B2E4B] text-white font-semibold text-base active:scale-[0.98] transition-transform shadow-lg shadow-[#1B2E4B]/20"
                 >
                   Send Request
                 </button>

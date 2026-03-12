@@ -33,29 +33,24 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <div className="relative flex flex-col h-full bg-[#0D1B2A] overflow-hidden">
-      {/* BG gradients */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-[#00C9A7] opacity-[0.03] blur-3xl" />
-      </div>
-
+    <div className="relative flex flex-col h-full bg-white overflow-hidden">
       {/* Header */}
-      <div className="pt-16 pb-8 px-6 z-10">
+      <div className="bg-[#1B2E4B] px-6 pt-16 pb-10 rounded-b-[32px]">
         <motion.div
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.5 }}
         >
-          <h1 className="text-3xl font-black text-white" style={{ fontFamily: "'Syne', sans-serif" }}>
-            Create Your <span className="text-[#00C9A7]">Profile</span>
+          <h1 className="text-2xl font-extrabold text-white">
+            Create Your Profile
           </h1>
-          <p className="text-white/50 mt-2 text-sm" style={{ fontFamily: "'Manrope', sans-serif" }}>
+          <p className="text-white/60 mt-2 text-sm font-medium">
             Let friends know who you are
           </p>
         </motion.div>
       </div>
 
-      <div className="flex-1 px-6 z-10 flex flex-col gap-6">
+      <div className="flex-1 px-6 pt-6 z-10 flex flex-col gap-6">
         {/* Avatar */}
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
@@ -64,9 +59,9 @@ export default function OnboardingScreen() {
           className="flex justify-center"
         >
           <div className="relative">
-            <div className="w-24 h-24 rounded-3xl bg-[#1A2B3C] border-2 border-[#00C9A7]/30 flex items-center justify-center">
+            <div className="w-24 h-24 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center">
               {name ? (
-                <span className="text-3xl font-black text-[#00C9A7]" style={{ fontFamily: "'Syne', sans-serif" }}>
+                <span className="text-2xl font-extrabold text-[#1B2E4B]">
                   {name
                     .trim()
                     .split(" ")
@@ -76,11 +71,11 @@ export default function OnboardingScreen() {
                     .toUpperCase()}
                 </span>
               ) : (
-                <UserIcon className="w-10 h-10 text-white/20" />
+                <UserIcon className="w-10 h-10 text-gray-300" />
               )}
             </div>
-            <button className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-[#00C9A7] flex items-center justify-center shadow-lg shadow-[#00C9A7]/30">
-              <Camera className="w-4 h-4 text-[#0D1B2A]" />
+            <button className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-[#1B2E4B] flex items-center justify-center shadow-lg">
+              <Camera className="w-4 h-4 text-white" />
             </button>
           </div>
         </motion.div>
@@ -93,7 +88,7 @@ export default function OnboardingScreen() {
           className="flex flex-col gap-4"
         >
           <div>
-            <label className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2 block" style={{ fontFamily: "'Manrope', sans-serif" }}>
+            <label className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-2 block">
               Full Name
             </label>
             <input
@@ -105,12 +100,11 @@ export default function OnboardingScreen() {
                 setError("");
               }}
               onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-              className="w-full h-14 px-4 rounded-2xl bg-[#1A2B3C] border border-white/10 text-white placeholder-white/30 text-base font-medium focus:outline-none focus:border-[#00C9A7]/50 transition-colors"
-              style={{ fontFamily: "'Manrope', sans-serif" }}
+              className="w-full h-14 px-4 rounded-2xl bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 text-base font-medium focus:outline-none focus:border-[#1B2E4B] focus:ring-1 focus:ring-[#1B2E4B]/20 transition-all"
               autoFocus
             />
             {error && (
-              <p className="text-[#FF6B6B] text-sm mt-2" style={{ fontFamily: "'Manrope', sans-serif" }}>
+              <p className="text-red-500 text-sm mt-2">
                 {error}
               </p>
             )}
@@ -118,14 +112,14 @@ export default function OnboardingScreen() {
 
           {/* Phone (locked) */}
           <div>
-            <label className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2 block" style={{ fontFamily: "'Manrope', sans-serif" }}>
+            <label className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-2 block">
               Phone Number
             </label>
-            <div className="flex items-center gap-3 h-14 px-4 rounded-2xl bg-[#1A2B3C]/60 border border-white/5">
-              <span className="text-white/40 text-base" style={{ fontFamily: "'Manrope', sans-serif" }}>
+            <div className="flex items-center gap-3 h-14 px-4 rounded-2xl bg-gray-50 border border-gray-100">
+              <span className="text-gray-500 text-base">
                 +1 (555) 234-5678
               </span>
-              <span className="ml-auto text-xs text-[#00C9A7] font-semibold uppercase tracking-wider bg-[#00C9A7]/10 px-2 py-1 rounded-full">
+              <span className="ml-auto text-xs text-emerald-600 font-semibold bg-emerald-50 px-2.5 py-1 rounded-full">
                 Verified ✓
               </span>
             </div>
@@ -141,8 +135,7 @@ export default function OnboardingScreen() {
         >
           <button
             onClick={handleCreate}
-            className="w-full h-14 rounded-2xl bg-[#00C9A7] text-[#0D1B2A] font-bold text-base active:scale-[0.98] transition-transform shadow-lg shadow-[#00C9A7]/20"
-            style={{ fontFamily: "'Manrope', sans-serif" }}
+            className="w-full h-14 rounded-2xl bg-[#1B2E4B] text-white font-semibold text-base active:scale-[0.98] transition-transform shadow-lg shadow-[#1B2E4B]/20"
           >
             Create My Profile
           </button>

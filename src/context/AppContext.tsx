@@ -21,6 +21,7 @@ type AppScreen =
   | "loan-request"
   | "register-payment"
   | "notifications"
+  | "contacts"
   | "profile";
 
 interface AppState {

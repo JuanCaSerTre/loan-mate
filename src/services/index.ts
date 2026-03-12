@@ -15,3 +15,21 @@ export { userService } from "./api/userService";
 
 export { pushNotificationService } from "./pushNotificationService";
 export { checkPaymentReminders } from "./paymentReminderService";
+
+// Invitation & contact services
+export {
+  generateReferralCode,
+  generateInvitationLink,
+  generateSMSInviteURI,
+  generateWhatsAppURI,
+  generateWhatsAppShareURI,
+  copyInvitationLink,
+  createInvitationRecord,
+  calculateInvitationMetrics,
+  isValidReferralCode,
+} from "./invitationService";
+export {
+  normalizePhoneNumber,
+  matchContacts,
+  sendInvitation,
+} from "./contactService";
