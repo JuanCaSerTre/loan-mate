@@ -1,70 +1,147 @@
 /**
  * LoanMate — Payment Service
- * CRUD operations for payments.
- * Currently uses mock data; swap to Supabase queries when connected.
+ * CRUD operations for payments via Supabase.
  */
 import { Payment, PaymentStatus } from "@/types/loan";
-import { mockPayments } from "@/data/mockData";
+import { supabase } from "@/lib/supabase";
 import type { ApiResponse } from "./client";
 import type { CreatePaymentModel } from "@/models/schemas";
 
 class PaymentService {
   /**
    * Fetch all payments for a loan.
-   * TODO: Replace with Supabase query
    */
   async getPaymentsForLoan(loanId: string): Promise<ApiResponse<Payment[]>> {
-    await this._delay(400);
+    try {
+      const { data, error } = await supabase
+        .from("payments")
+        .select(
+          `
+          id,
+          loan_id,
+          amount,
+          created_by_user_id,
+          status,
+          payment_date,
+          note,
+          created_at
+        `
+        )
+        .eq("loan_id", loanId)
+        .order("payment_date", { ascending: true });
 
-    const payments = mockPayments.filter((p) => p.loan_id === loanId);
-    return { data: payments, error: null, status: 200 };
+      if (error) throw error;
+
+      const payments: Payment[] = data.map((item: any) => ({
+        payment_id: item.id,
+        loan_id: item.loan_id,
+        amount: item.amount,
+        created_by_user: item.created_by_user_id,
+        status: item.status,
+        note: item.note,
+        payment_date: item.payment_date,
+        created_at: item.created_at,
+      }));
+
+      return { data: payments, error: null, status: 200 };
+    } catch (err: any) {
+      return {
+        data: null,
+        error: {
+          code: "QUERY_ERROR",
+          message: err.message || "Failed to fetch payments",
+        },
+        status: 500,
+      };
+    }
   }
 
   /**
    * Register a new payment.
-   * TODO: Replace with Supabase insert
    */
   async createPayment(
     userId: string,
     input: CreatePaymentModel
   ): Promise<ApiResponse<Payment>> {
-    await this._delay(600);
+    try {
+      const { data, error } = await supabase
+        .from("payments")
+        .insert({
+          loan_id: input.loan_id,
+          amount: input.amount,
+          created_by_user_id: userId,
+          status: "pending_confirmation",
+          payment_date: input.payment_date,
+          note: input.note || null,
+        })
+        .select()
+        .single();
 
-    const newPayment: Payment = {
-      payment_id: `pay_${Date.now()}`,
-      loan_id: input.loan_id,
-      amount: input.amount,
-      created_by_user: userId,
-      status: "pending_confirmation",
-      note: input.note,
-      created_at: new Date().toISOString(),
-      payment_date: input.payment_date,
-    };
+      if (error) throw error;
 
-    return { data: newPayment, error: null, status: 201 };
+      const newPayment: Payment = {
+        payment_id: data.id,
+        loan_id: data.loan_id,
+        amount: data.amount,
+        created_by_user: data.created_by_user_id,
+        status: data.status,
+        payment_date: data.payment_date,
+        note: data.note,
+        created_at: data.created_at,
+      };
+
+      return { data: newPayment, error: null, status: 201 };
+    } catch (err: any) {
+      return {
+        data: null,
+        error: {
+          code: "INSERT_ERROR",
+          message: err.message || "Failed to create payment",
+        },
+        status: 500,
+      };
+    }
   }
 
   /**
    * Update payment status (confirm or reject).
-   * TODO: Replace with Supabase update
    */
   async updatePaymentStatus(
     paymentId: string,
     status: PaymentStatus
   ): Promise<ApiResponse<Payment>> {
-    await this._delay(400);
+    try {
+      const { data, error } = await supabase
+        .from("payments")
+        .update({ status })
+        .eq("id", paymentId)
+        .select()
+        .single();
 
-    const payment = mockPayments.find((p) => p.payment_id === paymentId);
-    if (!payment) {
+      if (error) throw error;
+
+      const payment: Payment = {
+        payment_id: data.id,
+        loan_id: data.loan_id,
+        amount: data.amount,
+        created_by_user: data.created_by_user_id,
+        status: data.status,
+        payment_date: data.payment_date,
+        note: data.note,
+        created_at: data.created_at,
+      };
+
+      return { data: payment, error: null, status: 200 };
+    } catch (err: any) {
       return {
         data: null,
-        error: { code: "NOT_FOUND", message: "Payment not found" },
-        status: 404,
+        error: {
+          code: "UPDATE_ERROR",
+          message: err.message || "Failed to update payment status",
+        },
+        status: 500,
       };
     }
-
-    const updated = { ...payment, status };
-    return { data: updated, error: null, status: 200 };
   }
 
   /**
@@ -74,21 +151,56 @@ class PaymentService {
     userId: string,
     loans: { loan_id: string; borrower_id: string }[]
   ): Promise<ApiResponse<Payment[]>> {
-    await this._delay(300);
+    try {
+      const userLoanIds = loans
+        .filter((l) => l.borrower_id === userId)
+        .map((l) => l.loan_id);
 
-    const userLoanIds = loans
-      .filter((l) => l.borrower_id === userId)
-      .map((l) => l.loan_id);
+      if (userLoanIds.length === 0) {
+        return { data: [], error: null, status: 200 };
+      }
 
-    const pending = mockPayments.filter(
-      (p) => p.status === "pending_confirmation" && userLoanIds.includes(p.loan_id)
-    );
+      const { data, error } = await supabase
+        .from("payments")
+        .select(
+          `
+          id,
+          loan_id,
+          amount,
+          created_by_user_id,
+          status,
+          payment_date,
+          note,
+          created_at
+        `
+        )
+        .eq("status", "pending_confirmation")
+        .in("loan_id", userLoanIds);
 
-    return { data: pending, error: null, status: 200 };
-  }
+      if (error) throw error;
 
-  private _delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+      const payments: Payment[] = data.map((item: any) => ({
+        payment_id: item.id,
+        loan_id: item.loan_id,
+        amount: item.amount,
+        created_by_user: item.created_by_user_id,
+        status: item.status,
+        note: item.note,
+        payment_date: item.payment_date,
+        created_at: item.created_at,
+      }));
+
+      return { data: payments, error: null, status: 200 };
+    } catch (err: any) {
+      return {
+        data: null,
+        error: {
+          code: "QUERY_ERROR",
+          message: err.message || "Failed to fetch pending confirmations",
+        },
+        status: 500,
+      };
+    }
   }
 }
 

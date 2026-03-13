@@ -1,74 +1,191 @@
 /**
  * LoanMate — User Service
- * User lookup, profile management.
+ * User lookup, profile management via Supabase.
  */
 import { User } from "@/types/loan";
-import { mockUsers } from "@/data/mockData";
+import { supabase } from "@/lib/supabase";
 import type { ApiResponse } from "./client";
 
 class UserService {
   /**
    * Find user by phone number.
-   * TODO: Replace with Supabase query
    */
   async findByPhone(phone: string): Promise<ApiResponse<User | null>> {
-    await this._delay(500);
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("phone_number", phone)
+        .single();
 
-    const cleanPhone = phone.replace(/\D/g, "");
-    const user = mockUsers.find((u) =>
-      u.phone_number.replace(/\D/g, "").includes(cleanPhone)
-    ) || null;
+      if (error) {
+        if (error.code === "PGRST116") {
+          // No rows returned
+          return {
+            data: null,
+            error: { code: "NOT_FOUND", message: "User not found" },
+            status: 404,
+          };
+        }
+        throw error;
+      }
 
-    if (!user) {
+      return {
+        data: {
+          id: data.id,
+          phone_number: data.phone_number,
+          name: data.name,
+          avatar: data.avatar_url,
+          created_at: data.created_at,
+        },
+        error: null,
+        status: 200,
+      };
+    } catch (err: any) {
       return {
         data: null,
-        error: { code: "NOT_FOUND", message: "User not found" },
-        status: 404,
+        error: {
+          code: "QUERY_ERROR",
+          message: err.message || "Failed to find user",
+        },
+        status: 500,
       };
     }
-
-    return { data: user, error: null, status: 200 };
   }
 
   /**
    * Get user by ID.
    */
   async getUserById(userId: string): Promise<ApiResponse<User | null>> {
-    await this._delay(300);
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", userId)
+        .single();
 
-    const user = mockUsers.find((u) => u.id === userId) || null;
-    if (!user) {
+      if (error) {
+        if (error.code === "PGRST116") {
+          return {
+            data: null,
+            error: { code: "NOT_FOUND", message: "User not found" },
+            status: 404,
+          };
+        }
+        throw error;
+      }
+
+      return {
+        data: {
+          id: data.id,
+          phone_number: data.phone_number,
+          name: data.name,
+          avatar: data.avatar_url,
+          created_at: data.created_at,
+        },
+        error: null,
+        status: 200,
+      };
+    } catch (err: any) {
       return {
         data: null,
-        error: { code: "NOT_FOUND", message: "User not found" },
-        status: 404,
+        error: {
+          code: "QUERY_ERROR",
+          message: err.message || "Failed to get user",
+        },
+        status: 500,
       };
     }
+  }
 
-    return { data: user, error: null, status: 200 };
+  /**
+   * Create or update user profile.
+   */
+  async upsertProfile(
+    userId: string,
+    phoneNumber: string,
+    name: string,
+    avatarUrl?: string
+  ): Promise<ApiResponse<User>> {
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .upsert({
+          id: userId,
+          phone_number: phoneNumber,
+          name,
+          avatar_url: avatarUrl || null,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return {
+        data: {
+          id: data.id,
+          phone_number: data.phone_number,
+          name: data.name,
+          avatar: data.avatar_url,
+          created_at: data.created_at,
+        },
+        error: null,
+        status: 200,
+      };
+    } catch (err: any) {
+      return {
+        data: null,
+        error: {
+          code: "UPSERT_ERROR",
+          message: err.message || "Failed to upsert profile",
+        },
+        status: 500,
+      };
+    }
   }
 
   /**
    * Update user profile.
-   * TODO: Replace with Supabase update
    */
   async updateProfile(
     userId: string,
     updates: Partial<Pick<User, "name" | "avatar">>
   ): Promise<ApiResponse<User>> {
-    await this._delay(400);
+    try {
+      const updateData: Record<string, any> = {};
+      if (updates.name) updateData.name = updates.name;
+      if (updates.avatar) updateData.avatar_url = updates.avatar;
 
-    const user = mockUsers.find((u) => u.id === userId);
-    if (!user) {
+      const { data, error } = await supabase
+        .from("users")
+        .update(updateData)
+        .eq("id", userId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return {
+        data: {
+          id: data.id,
+          phone_number: data.phone_number,
+          name: data.name,
+          avatar: data.avatar_url,
+          created_at: data.created_at,
+        },
+        error: null,
+        status: 200,
+      };
+    } catch (err: any) {
       return {
         data: null,
-        error: { code: "NOT_FOUND", message: "User not found" },
-        status: 404,
+        error: {
+          code: "UPDATE_ERROR",
+          message: err.message || "Failed to update profile",
+        },
+        status: 500,
       };
     }
-
-    const updated = { ...user, ...updates };
-    return { data: updated, error: null, status: 200 };
   }
 
   /**
@@ -81,24 +198,50 @@ class UserService {
       completedLoans: number;
     }>
   > {
-    await this._delay(300);
+    try {
+      // Count loans as lender
+      const { count: loansGiven } = await supabase
+        .from("loans")
+        .select("*", { count: "exact", head: true })
+        .eq("lender_id", userId);
 
-    // Mock stats - in real app, aggregate from loans table
-    return {
-      data: {
-        loansGiven: 3,
-        loansReceived: 2,
-        completedLoans: 1,
-      },
-      error: null,
-      status: 200,
-    };
-  }
+      // Count loans as borrower
+      const { count: loansReceived } = await supabase
+        .from("loans")
+        .select("*", { count: "exact", head: true })
+        .eq("borrower_id", userId);
 
-  private _delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+      // Count completed loans
+      const { count: completedLoans } = await supabase
+        .from("loans")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "completed")
+        .or(`lender_id.eq.${userId},borrower_id.eq.${userId}`);
+
+      return {
+        data: {
+          loansGiven: loansGiven || 0,
+          loansReceived: loansReceived || 0,
+          completedLoans: completedLoans || 0,
+        },
+        error: null,
+        status: 200,
+      };
+    } catch (err: any) {
+      return {
+        data: null,
+        error: {
+          code: "STATS_ERROR",
+          message: err.message || "Failed to get user stats",
+        },
+        status: 500,
+      };
+    }
   }
 }
+
+export const userService = new UserService();
+export default UserService;
 
 export const userService = new UserService();
 export default UserService;

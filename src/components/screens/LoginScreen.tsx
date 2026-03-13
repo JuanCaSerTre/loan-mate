@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, ShieldAlert } from "lucide-react";
 import { useApp } from "@/context/AppContext";
@@ -77,7 +77,9 @@ export default function LoginScreen() {
     // Check OTP lockout
     const otpCheck = securityService.checkOTPAttempt(fullPhone);
     if (!otpCheck.allowed) {
-      setError(`Too many failed attempts. Try again in ${otpCheck.lockoutUntil}`);
+      setError(
+        `Too many failed attempts. Try again in ${otpCheck.lockoutUntil}`,
+      );
       setOtp(["", "", "", "", "", ""]);
       return;
     }
@@ -87,8 +89,8 @@ export default function LoginScreen() {
       securityService.clearOTPAttempts(fullPhone);
 
       // Check if returning or new user
-      const existingUser = mockUsers.find(
-        (u) => u.phone_number.replace(/\D/g, "").includes(phone.replace(/\D/g, ""))
+      const existingUser = mockUsers.find((u) =>
+        u.phone_number.replace(/\D/g, "").includes(phone.replace(/\D/g, "")),
       );
       if (existingUser) {
         login(existingUser);
@@ -105,7 +107,9 @@ export default function LoginScreen() {
       if (!updatedCheck.allowed) {
         setError(`Account locked. Try again in ${updatedCheck.lockoutUntil}`);
       } else {
-        setError(`Invalid verification code. ${updatedCheck.remainingAttempts} attempt${updatedCheck.remainingAttempts !== 1 ? "s" : ""} remaining.`);
+        setError(
+          `Invalid verification code. ${updatedCheck.remainingAttempts} attempt${updatedCheck.remainingAttempts !== 1 ? "s" : ""} remaining.`,
+        );
       }
       setOtp(["", "", "", "", "", ""]);
       setTimeout(() => {
@@ -141,11 +145,12 @@ export default function LoginScreen() {
             Loan<span className="text-emerald-400">Mate</span>
           </h1>
           <p className="text-white/60 mt-2 text-sm font-medium">
-            {step === "phone" ? "Enter your phone number to get started" : "Enter the 6-digit code we sent"}
+            {step === "phone"
+              ? "Enter your phone number to get started"
+              : "Enter the 6-digit code we sent"}
           </p>
         </motion.div>
       </div>
-
       <div className="flex-1 px-6 pt-8 z-10">
         <AnimatePresence mode="wait">
           {step === "phone" ? (
@@ -210,9 +215,7 @@ export default function LoginScreen() {
               </div>
 
               {error && (
-                <p className="text-red-500 text-sm font-medium">
-                  {error}
-                </p>
+                <p className="text-red-500 text-sm font-medium">{error}</p>
               )}
 
               <button
@@ -223,7 +226,8 @@ export default function LoginScreen() {
               </button>
 
               <p className="text-center text-gray-400 text-xs mt-4">
-                By continuing, you agree to our Terms of Service and Privacy Policy
+                By continuing, you agree to our Terms of Service and Privacy
+                Policy
               </p>
             </motion.div>
           ) : (
@@ -267,8 +271,8 @@ export default function LoginScreen() {
                       isShaking
                         ? "border-red-400 shadow-[0_0_12px_rgba(239,68,68,0.2)]"
                         : digit
-                        ? "border-[#1B2E4B] shadow-sm"
-                        : "border-gray-200 focus:border-[#1B2E4B]"
+                          ? "border-[#1B2E4B] shadow-sm"
+                          : "border-gray-200 focus:border-[#1B2E4B]"
                     }`}
                     style={{ fontFamily: "'JetBrains Mono', monospace" }}
                   />
@@ -286,7 +290,9 @@ export default function LoginScreen() {
                 {resendTimer > 0 ? (
                   <p className="text-gray-400 text-sm">
                     Resend code in{" "}
-                    <span className="text-[#1B2E4B] font-mono font-semibold">{resendTimer}s</span>
+                    <span className="text-[#1B2E4B] font-mono font-semibold">
+                      {resendTimer}s
+                    </span>
                   </p>
                 ) : (
                   <button
@@ -307,11 +313,16 @@ export default function LoginScreen() {
               </button>
 
               <p className="text-center text-gray-400 text-xs">
-                Hint: use <span className="font-mono text-[#1B2E4B]/60">123456</span> for demo
+                Hint: use{" "}
+                <span className="font-mono text-[#1B2E4B]/60">123456</span> for
+                demo
               </p>
             </motion.div>
           )}
         </AnimatePresence>
+        <h1 className="text-4xl font-extrabold tracking-tight h-[40px]  text-black">
+          Header 1
+        </h1>
       </div>
     </div>
   );
