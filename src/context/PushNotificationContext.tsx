@@ -82,7 +82,7 @@ export function PushNotificationProvider({ children }: { children: React.ReactNo
   const reminderTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [hasPrompted, setHasPrompted] = useState(() => {
     try {
-      return localStorage.getItem("loanmate_push_prompted") === "true";
+      return localStorage.getItem("juca_push_prompted") === "true";
     } catch {
       return false;
     }
@@ -160,7 +160,7 @@ export function PushNotificationProvider({ children }: { children: React.ReactNo
 
       setHasPrompted(true);
       try {
-        localStorage.setItem("loanmate_push_prompted", "true");
+        localStorage.setItem("juca_push_prompted", "true");
       } catch { /* ignore */ }
     }, 5000);
 

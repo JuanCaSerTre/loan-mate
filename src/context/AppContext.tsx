@@ -131,7 +131,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     users: [],
     selectedLoanId: null,
     selectedPaymentId: null,
-    termsAcceptedAt: localStorage.getItem("loanmate_terms_accepted_at") ?? null,
+    termsAcceptedAt: localStorage.getItem("juca_terms_accepted_at") ?? null,
   });
 
   const navigate = useCallback((screen: AppScreen) => {
@@ -140,7 +140,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Auto-restore session from localStorage on mount
   useEffect(() => {
-    const storedUserId = localStorage.getItem("loanmate_user_id");
+    const storedUserId = localStorage.getItem("juca_user_id");
     if (storedUserId) {
       // Attempt to restore session by fetching user from Supabase
       db.getUserById(storedUserId).then((user) => {
@@ -148,11 +148,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           login(user);
         } else {
           // Stored user no longer exists — clear and show login
-          localStorage.removeItem("loanmate_user_id");
+          localStorage.removeItem("juca_user_id");
           setState((prev) => ({ ...prev, currentScreen: "login" }));
         }
       }).catch(() => {
-        localStorage.removeItem("loanmate_user_id");
+        localStorage.removeItem("juca_user_id");
         setState((prev) => ({ ...prev, currentScreen: "login" }));
       });
     }
@@ -160,7 +160,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (user: User) => {
     // Persist user ID for session restoration
-    localStorage.setItem("loanmate_user_id", user.id);
+    localStorage.setItem("juca_user_id", user.id);
 
     // Issue auth token and configure API client
     const token = securityService.generateToken(user.id);
@@ -172,7 +172,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     trackDailyActiveUser(user.id);
 
     // Determine whether the user still needs to see the terms screen
-    const storedAcceptance = localStorage.getItem("loanmate_terms_accepted_at");
+    const storedAcceptance = localStorage.getItem("juca_terms_accepted_at");
 
     // Set authenticated state immediately so the UI responds
     setState((prev) => ({
@@ -213,7 +213,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const acceptTerms = useCallback(() => {
     const timestamp = new Date().toISOString();
     // Persist acceptance so it survives page refresh
-    localStorage.setItem("loanmate_terms_accepted_at", timestamp);
+    localStorage.setItem("juca_terms_accepted_at", timestamp);
 
     setState((prev) => {
       securityService.logEvent({
@@ -233,7 +233,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     // Clear session
-    localStorage.removeItem("loanmate_user_id");
+    localStorage.removeItem("juca_user_id");
 
     // Clear auth token and API client auth
     securityService.clearToken();

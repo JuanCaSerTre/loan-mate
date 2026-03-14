@@ -49,10 +49,10 @@ export interface AuthToken {
 
 // ─── Storage Keys ────────────────────────────────────────────────
 const STORAGE_KEYS = {
-  ACTIVITY_LOG: "loanmate_security_log",
-  AUTH_TOKEN: "loanmate_auth_token",
-  OTP_ATTEMPTS: "loanmate_otp_attempts",
-  RATE_LIMITS: "loanmate_rate_limits",
+  ACTIVITY_LOG: "juca_security_log",
+  AUTH_TOKEN: "juca_auth_token",
+  OTP_ATTEMPTS: "juca_otp_attempts",
+  RATE_LIMITS: "juca_rate_limits",
 } as const;
 
 // ─── Security Service ────────────────────────────────────────────

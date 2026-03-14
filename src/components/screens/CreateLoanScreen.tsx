@@ -270,7 +270,7 @@ export default function CreateLoanScreen() {
                   <p className="text-gray-900 text-sm font-semibold">Pick from Contacts</p>
                   <p className="text-gray-400 text-xs">
                     {contactsLoaded
-                      ? `${contactFriends.length} friend${contactFriends.length !== 1 ? "s" : ""} on LoanMate`
+                      ? `${contactFriends.length} friend${contactFriends.length !== 1 ? "s" : ""} on JUCA`
                       : "Sync contacts to find friends"}
                   </p>
                 </div>
@@ -307,7 +307,7 @@ export default function CreateLoanScreen() {
                           <div className="flex flex-col items-center py-6">
                             <Users className="w-6 h-6 text-gray-300 mb-2" />
                             <p className="text-gray-400 text-xs">
-                              {contactSearch ? "No matches" : "No LoanMate friends found"}
+                              {contactSearch ? "No matches" : "No JUCA friends found"}
                             </p>
                           </div>
                         ) : (
@@ -812,7 +812,7 @@ export default function CreateLoanScreen() {
               {!securityError && (
                 <div className="flex items-center justify-center gap-1.5 py-1">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                  <span className="text-emerald-600 text-[10px] font-semibold">Protected by LoanMate Security</span>
+                  <span className="text-emerald-600 text-[10px] font-semibold">Protected by JUCA Security</span>
                 </div>
               )}
 

@@ -153,7 +153,7 @@ class PushNotificationService {
         // Show local notification for foreground messages
         if (payload.notification) {
           this.showLocalNotification(
-            payload.notification.title || "LoanMate",
+            payload.notification.title || "JUCA",
             payload.notification.body || "",
             { data: payload.data }
           );
@@ -194,7 +194,7 @@ class PushNotificationService {
           body,
           icon: options?.icon || "/vite.svg",
           badge: "/vite.svg",
-          tag: options?.tag || "loanmate-notification",
+          tag: options?.tag || "juca-notification",
           data: options?.data,
           requireInteraction: options?.requireInteraction || false,
           vibrate: [200, 100, 200],
@@ -204,7 +204,7 @@ class PushNotificationService {
         new Notification(title, {
           body,
           icon: options?.icon || "/vite.svg",
-          tag: options?.tag || "loanmate-notification",
+          tag: options?.tag || "juca-notification",
         });
       }
       return true;
@@ -226,7 +226,7 @@ class PushNotificationService {
       `${emoji} ${notification.title}`,
       notification.message,
       {
-        tag: `loanmate-${tag}-${notification.id}`,
+        tag: `juca-${tag}-${notification.id}`,
         data: {
           notificationId: notification.id,
           type: notification.type,

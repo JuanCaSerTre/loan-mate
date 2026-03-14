@@ -13,7 +13,7 @@ import {
 // ─── Constants ───────────────────────────────────────────────────
 
 /** Base URL for the app — in production this would be a dynamic link / deep link */
-const APP_BASE_URL = "https://loanmate.app";
+const APP_BASE_URL = "https://juca.app";
 const APP_DOWNLOAD_URL = `${APP_BASE_URL}/download`;
 
 // ─── Referral Code Generation ────────────────────────────────────
@@ -41,7 +41,7 @@ export function generateInvitationLink(
   referralCode: string
 ): InvitationLink {
   const url = `${APP_DOWNLOAD_URL}?ref=${referralCode}`;
-  const message = `Hey, I just registered a loan using LoanMate so we can track payments easily. Download the app here: ${url}`;
+  const message = `Hola, acabo de registrar un acuerdo en JUCA para llevar un seguimiento fácil. Descarga la app aquí: ${url}`;
 
   return {
     url,
@@ -59,7 +59,7 @@ export function generatePersonalizedMessage(
   referralCode: string
 ): string {
   const url = `${APP_DOWNLOAD_URL}?ref=${referralCode}`;
-  return `Hey ${recipientName}, I just registered a loan using LoanMate so we can track payments easily. Download the app here: ${url}`;
+  return `Hola ${recipientName}, acabo de registrar un acuerdo en JUCA para llevar un seguimiento fácil. Descarga la app aquí: ${url}`;
 }
 
 // ─── SMS Invitation ──────────────────────────────────────────────

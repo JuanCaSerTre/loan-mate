@@ -8,7 +8,7 @@ import { createUser } from "@/services/api/supabaseDataService";
 export default function OnboardingScreen() {
   const { login } = useApp();
   const [name, setName] = useState("");
-  const verifiedPhone = sessionStorage.getItem("loanmate_verified_phone") || "";
+  const verifiedPhone = sessionStorage.getItem("juca_verified_phone") || "";
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -43,7 +43,7 @@ export default function OnboardingScreen() {
       return;
     }
 
-    sessionStorage.removeItem("loanmate_verified_phone");
+    sessionStorage.removeItem("juca_verified_phone");
     trackUserSignup(savedUser.id);
     login(savedUser);
   };

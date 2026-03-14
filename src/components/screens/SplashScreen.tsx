@@ -53,11 +53,11 @@ export default function SplashScreen() {
           transition={{ delay: 0.4, duration: 0.5 }}
           className="text-center"
         >
-          <h1 className="text-4xl font-extrabold text-white tracking-tight">
-            Loan<span className="text-emerald-400">Mate</span>
+          <h1 className="text-5xl font-extrabold text-white tracking-tight" style={{ fontFamily: "'Syne', sans-serif" }}>
+            JU<span className="text-[#00C9A7]">CA</span>
           </h1>
           <p className="text-white/50 text-sm mt-2 font-medium">
-            Loans between friends, made honest.
+            Acuerdos claros entre personas de confianza.
           </p>
         </motion.div>
 

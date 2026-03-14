@@ -29,7 +29,7 @@ export default function LoginScreen() {
     setIsLoading(true);
 
     const fullPhone = countryCode.code + phone.replace(/\D/g, "");
-    sessionStorage.setItem("loanmate_verified_phone", fullPhone);
+    sessionStorage.setItem("juca_verified_phone", fullPhone);
 
     try {
       // Check if user already exists in Supabase
@@ -60,7 +60,7 @@ export default function LoginScreen() {
           transition={{ duration: 0.5 }}
         >
           <h1 className="text-3xl font-extrabold text-white">
-            Loan<span className="text-emerald-400">Mate</span>
+            JU<span className="text-emerald-400">CA</span>
           </h1>
           <p className="text-white/60 mt-2 text-sm font-medium">
             Enter your phone number to get started

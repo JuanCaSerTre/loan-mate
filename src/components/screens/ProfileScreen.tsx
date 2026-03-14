@@ -186,7 +186,7 @@ export default function ProfileScreen() {
             </span>
           </div>
           <p className="text-white/50 text-xs mb-3">
-            Share LoanMate with friends and track loans together
+            Share JUCA with friends and keep track of your agreements together
           </p>
           <button
             onClick={handleCopyLink}
@@ -363,7 +363,7 @@ export default function ProfileScreen() {
                     <div className="flex-1 text-left">
                       <p className="text-gray-800 text-xs font-semibold">1 Day Before Due</p>
                       <p className="text-gray-400 text-[10px]">
-                        "Payment due tomorrow for your LoanMate loan."
+                        "Payment due tomorrow for your JUCA agreement."
                       </p>
                     </div>
                     <div className={`w-9 h-5 rounded-full transition-colors relative ${

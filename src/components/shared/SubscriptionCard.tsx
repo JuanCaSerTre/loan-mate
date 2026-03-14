@@ -75,7 +75,7 @@ export default function SubscriptionCard({
             <Crown className="w-4 h-4 text-amber-400" />
           </div>
           <div>
-            <h3 className="text-white text-sm font-bold">LoanMate Premium</h3>
+            <h3 className="text-white text-sm font-bold">JUCA Premium</h3>
             <span className={`inline-flex text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${statusBadge.color}`}>
               {statusBadge.label}
             </span>

@@ -186,7 +186,7 @@ export default function DashboardScreen() {
             </div>
             <div className="flex-1 text-left">
               <p className="text-gray-900 text-sm font-semibold">
-                Find Friends on LoanMate
+                Find Friends on JUCA
               </p>
               <p className="text-gray-400 text-xs">
                 Sync contacts · Create loans instantly

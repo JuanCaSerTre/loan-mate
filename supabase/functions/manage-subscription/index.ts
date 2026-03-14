@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
         "POST",
         {
           customer: user.stripe_customer_id,
-          return_url: return_url || "https://loanmate.app",
+          return_url: return_url || "https://juca.app",
         }
       );
 

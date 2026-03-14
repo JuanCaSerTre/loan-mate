@@ -74,7 +74,7 @@ export function clearUser() {
 
 // ─── Daily Active User ────────────────────────────────────────────────────────
 
-const DAU_STORAGE_KEY = "loanmate_dau_last_tracked";
+const DAU_STORAGE_KEY = "juca_dau_last_tracked";
 
 /**
  * Fire once per calendar day per browser session.

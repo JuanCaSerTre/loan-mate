@@ -142,7 +142,7 @@ export function matchContacts(
  */
 export function generateInviteSMSLink(phone: string, senderName: string): string {
   const message = encodeURIComponent(
-    `Hey! I'm using LoanMate to track loans between friends. Join me! 🤝💰 — ${senderName}`
+    `Hey! Estoy usando JUCA para registrar acuerdos con personas de confianza. ¡Únete! 🤝 — ${senderName}`
   );
   // sms: URI works on both iOS and Android
   return `sms:${phone}?body=${message}`;

@@ -33,8 +33,8 @@ export const DEFAULT_REMINDER_PREFERENCES: ReminderPreferences = {
 };
 
 // ─── LocalStorage Persistence ──────────────────────────────────────
-const REMINDER_STORAGE_KEY = "loanmate_sent_reminders";
-const REMINDER_PREFS_KEY = "loanmate_reminder_preferences";
+const REMINDER_STORAGE_KEY = "juca_sent_reminders";
+const REMINDER_PREFS_KEY = "juca_reminder_preferences";
 
 /**
  * Load reminder preferences from localStorage.

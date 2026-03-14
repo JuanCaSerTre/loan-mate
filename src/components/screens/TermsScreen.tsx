@@ -36,7 +36,7 @@ export default function TermsScreen() {
             Before You Continue
           </h1>
           <p className="text-white/50 text-sm font-medium leading-relaxed max-w-xs">
-            Please read and accept the following before using LoanMate.
+            Lee y acepta lo siguiente antes de usar JUCA.
           </p>
         </motion.div>
       </div>
@@ -61,9 +61,9 @@ export default function TermsScreen() {
 
           <div className="px-4 py-4 space-y-3">
             {[
-              "LoanMate does not provide loans or financial services.",
-              "LoanMate only provides tools to record agreements between individuals.",
-              "Users are fully responsible for any financial agreements created using the platform.",
+              "JUCA no ofrece préstamos ni servicios financieros.",
+              "JUCA solo proporciona herramientas para registrar acuerdos entre personas de confianza.",
+              "Los usuarios son completamente responsables de los acuerdos financieros creados en la plataforma.",
             ].map((text, i) => (
               <div key={i} className="flex items-start gap-3">
                 <div className="w-1.5 h-1.5 rounded-full bg-[#00C9A7] mt-[6px] flex-shrink-0" />
@@ -83,9 +83,9 @@ export default function TermsScreen() {
         >
           <Lock className="w-4 h-4 text-[#FFB347] mt-0.5 flex-shrink-0" />
           <p className="text-[#FFB347]/90 text-xs leading-relaxed">
-            By continuing, you acknowledge that LoanMate is a record-keeping tool only.
-            All financial agreements are strictly between you and the other party.
-            LoanMate bears no legal responsibility for any disputes arising from agreements recorded on this platform.
+            Al continuar, reconoces que JUCA es únicamente una herramienta de registro.
+            Todos los acuerdos financieros son estrictamente entre tú y la otra persona.
+            JUCA no tiene responsabilidad legal por ninguna disputa derivada de los acuerdos registrados en esta plataforma.
           </p>
         </motion.div>
 

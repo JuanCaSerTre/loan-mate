@@ -104,7 +104,7 @@ export default function ContactsScreen() {
           >
             <h2 className="text-white text-xl font-bold">Contacts</h2>
             <p className="text-white/60 text-sm mt-0.5">
-              Find friends on LoanMate
+              Find friends on JUCA
             </p>
           </motion.div>
         </div>
@@ -125,7 +125,7 @@ export default function ContactsScreen() {
                 Sync Your Contacts
               </h3>
               <p className="text-gray-500 text-sm leading-relaxed mb-6">
-                Find which of your friends already use LoanMate. Create loans
+                Find which of your friends already use JUCA. Create records
                 instantly by selecting a contact.
               </p>
 
@@ -230,7 +230,7 @@ export default function ContactsScreen() {
             <h2 className="text-white text-xl font-bold">Contacts</h2>
             <p className="text-white/60 text-sm mt-0.5">
               {filteredFriends.length} friend
-              {filteredFriends.length !== 1 ? "s" : ""} on LoanMate
+              {filteredFriends.length !== 1 ? "s" : ""} on JUCA
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -287,7 +287,7 @@ export default function ContactsScreen() {
             }`}
           >
             <Users className="w-3.5 h-3.5" />
-            LoanMate Friends
+            JUCA Friends
             {filteredFriends.length > 0 && (
               <span
                 className={`ml-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
@@ -351,7 +351,7 @@ export default function ContactsScreen() {
                     <p className="text-gray-400 text-sm font-medium">
                       {searchQuery
                         ? "No friends match your search"
-                        : "No contacts found on LoanMate yet"}
+                        : "No contacts found on JUCA yet"}
                     </p>
                     <p className="text-gray-300 text-xs mt-1">
                       Invite your friends to get started
@@ -444,7 +444,7 @@ export default function ContactsScreen() {
                     <p className="text-gray-400 text-sm font-medium">
                       {searchQuery
                         ? "No contacts match your search"
-                        : "All your contacts are already on LoanMate!"}
+                        : "All your contacts are already on JUCA!"}
                     </p>
                   </div>
                 ) : (
@@ -520,7 +520,7 @@ function FriendCard({
             </span>
             <span className="inline-flex items-center gap-0.5 text-[10px] text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-full px-1.5 py-0.5 flex-shrink-0">
               <Check className="w-2.5 h-2.5" />
-              On LoanMate
+              On JUCA
             </span>
           </div>
         </div>
