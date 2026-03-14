@@ -50,6 +50,14 @@ export default function DashboardScreen() {
   const totalLent = getTotalLent();
   const totalBorrowed = getTotalBorrowed();
   const pendingCount = getPendingActions();
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return { text: "Good morning", emoji: "☀️" };
+    if (hour < 18) return { text: "Good afternoon", emoji: "👋" };
+    return { text: "Good evening", emoji: "🌙" };
+  };
+  const greeting = getGreeting();
   const pendingLoanRequests = getPendingLoanRequests();
   const pendingPaymentConfirmations = getPendingPaymentConfirmations();
 
@@ -93,7 +101,7 @@ export default function DashboardScreen() {
         >
           <div>
             <p className="text-white/60 text-xs font-medium">
-              Good morning 👋
+              {greeting.text} {greeting.emoji}
             </p>
             <h2 className="text-white text-xl font-bold mt-0.5">
               {currentUser?.name.split(" ")[0]}
@@ -119,7 +127,7 @@ export default function DashboardScreen() {
               <div className="w-7 h-7 rounded-full bg-emerald-400/20 flex items-center justify-center">
                 <ArrowUpRight className="w-4 h-4 text-emerald-400" />
               </div>
-              <span className="text-white/60 text-[11px] font-medium">Total Lent</span>
+              <span className="text-white/60 text-[11px] font-medium">Lent Out</span>
             </div>
             <p className="text-white text-2xl font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
               ${totalLent.toLocaleString()}
@@ -132,13 +140,34 @@ export default function DashboardScreen() {
               <div className="w-7 h-7 rounded-full bg-amber-400/20 flex items-center justify-center">
                 <ArrowDownLeft className="w-4 h-4 text-amber-400" />
               </div>
-              <span className="text-white/60 text-[11px] font-medium">Total Owed</span>
+              <span className="text-white/60 text-[11px] font-medium">You Owe</span>
             </div>
             <p className="text-white text-2xl font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
               ${totalBorrowed.toLocaleString()}
             </p>
           </div>
         </motion.div>
+
+        {/* Net balance chip */}
+        {(totalLent > 0 || totalBorrowed > 0) && (() => {
+          const net = totalLent - totalBorrowed;
+          const positive = net >= 0;
+          return (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2 }}
+              className="flex justify-center mt-3"
+            >
+              <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${
+                positive ? "bg-emerald-400/20 text-emerald-300" : "bg-amber-400/20 text-amber-300"
+              }`}>
+                <span>{positive ? "▲" : "▼"}</span>
+                Net: {positive ? "+" : "-"}${Math.abs(net).toLocaleString()} {positive ? "in your favor" : "you owe more"}
+              </div>
+            </motion.div>
+          );
+        })()}
       </div>
 
       {/* Scrollable content */}
@@ -272,14 +301,27 @@ export default function DashboardScreen() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.3 }}
-              className="flex flex-col items-center gap-2 py-10"
+              className="flex flex-col items-center gap-3 py-10 bg-white rounded-2xl border border-dashed border-gray-200"
             >
-              <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-                <span className="text-2xl">🤝</span>
+              <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center">
+                <span className="text-3xl">🤝</span>
               </div>
-              <p className="text-gray-400 text-sm">
-                No active loans yet
-              </p>
+              <div className="text-center">
+                <p className="text-gray-700 text-sm font-semibold">
+                  No active loans yet
+                </p>
+                <p className="text-gray-400 text-xs mt-1">
+                  Tap the + button to record your first loan
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  if (guardCreateLoan()) navigate("create-loan");
+                }}
+                className="mt-1 px-5 py-2.5 bg-[#1B2E4B] text-white text-xs font-semibold rounded-xl active:scale-95 transition-transform"
+              >
+                + Create First Loan
+              </button>
             </motion.div>
           ) : (
             <div className="space-y-3">
@@ -301,9 +343,10 @@ export default function DashboardScreen() {
             navigate("create-loan");
           }
         }}
-        className="absolute bottom-20 right-5 w-14 h-14 rounded-full bg-[#1B2E4B] shadow-lg shadow-[#1B2E4B]/30 flex items-center justify-center z-20 active:scale-95 transition-transform"
+        className="absolute bottom-20 right-4 flex items-center gap-2 h-14 px-5 rounded-full bg-[#1B2E4B] shadow-xl shadow-[#1B2E4B]/40 z-20 active:scale-95 transition-transform"
       >
-        <Plus className="w-7 h-7 text-white" strokeWidth={2.5} />
+        <Plus className="w-5 h-5 text-white" strokeWidth={2.5} />
+        <span className="text-white text-sm font-bold">New Loan</span>
       </motion.button>
 
       {/* Paywall Modal */}

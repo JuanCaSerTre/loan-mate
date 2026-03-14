@@ -63,7 +63,7 @@ export default function LoginScreen() {
             JU<span className="text-emerald-400">CA</span>
           </h1>
           <p className="text-white/60 mt-2 text-sm font-medium">
-            Enter your phone number to get started
+            Your personal loan tracker
           </p>
         </motion.div>
       </div>
@@ -74,12 +74,16 @@ export default function LoginScreen() {
           transition={{ duration: 0.3 }}
           className="flex flex-col gap-4"
         >
+          <div>
+            <p className="text-gray-900 font-bold text-lg mb-1">Enter your phone number</p>
+            <p className="text-gray-400 text-sm">We'll verify it with a quick code</p>
+          </div>
           <div className="flex gap-2">
             {/* Country code picker */}
             <div className="relative">
               <button
                 onClick={() => setShowCountryPicker(!showCountryPicker)}
-                className="flex items-center gap-2 h-14 px-4 rounded-2xl bg-gray-50 border border-gray-200 text-gray-900 text-sm font-semibold min-w-[90px]"
+                className="flex items-center gap-2 h-14 px-4 rounded-2xl bg-gray-50 border border-gray-200 text-gray-900 text-sm font-semibold min-w-[90px] active:scale-95 transition-transform"
               >
                 <span>{countryCode.flag}</span>
                 <span>{countryCode.code}</span>
@@ -122,18 +126,28 @@ export default function LoginScreen() {
                 setError("");
               }}
               onKeyDown={(e) => e.key === "Enter" && handleContinue()}
-              className="flex-1 h-14 px-4 rounded-2xl bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 text-base font-medium focus:outline-none focus:border-[#1B2E4B] focus:ring-1 focus:ring-[#1B2E4B]/20 transition-all"
+              className={`flex-1 h-14 px-4 rounded-2xl bg-gray-50 border text-gray-900 placeholder-gray-400 text-base font-medium focus:outline-none transition-all ${
+                error
+                  ? "border-red-400 focus:border-red-500 bg-red-50/30"
+                  : "border-gray-200 focus:border-[#1B2E4B] focus:ring-2 focus:ring-[#1B2E4B]/10 focus:bg-white"
+              }`}
             />
           </div>
 
           {error && (
-            <p className="text-red-500 text-sm font-medium">{error}</p>
+            <motion.p
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-red-500 text-sm font-medium flex items-center gap-1.5"
+            >
+              <span>⚠️</span> {error}
+            </motion.p>
           )}
 
           <button
             onClick={handleContinue}
-            disabled={isLoading}
-            className="w-full h-14 rounded-2xl bg-[#1B2E4B] text-white font-semibold text-base active:scale-[0.98] transition-transform mt-2 shadow-lg shadow-[#1B2E4B]/20 disabled:opacity-60 flex items-center justify-center gap-2"
+            disabled={isLoading || phone.length < 7}
+            className="w-full h-14 rounded-2xl bg-[#1B2E4B] text-white font-semibold text-base active:scale-[0.98] transition-transform mt-2 shadow-lg shadow-[#1B2E4B]/20 disabled:opacity-40 flex items-center justify-center gap-2"
           >
             {isLoading ? (
               <>
@@ -141,14 +155,16 @@ export default function LoginScreen() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                 </svg>
-                Logging in…
+                Verifying…
               </>
-            ) : "Continue"}
+            ) : "Continue →"}
           </button>
 
           <p className="text-center text-gray-400 text-xs mt-2">
-            By continuing, you agree to our Terms of Service and Privacy
-            Policy
+            By continuing, you agree to our{" "}
+            <span className="text-[#1B2E4B] font-semibold">Terms of Service</span>{" "}
+            and{" "}
+            <span className="text-[#1B2E4B] font-semibold">Privacy Policy</span>
           </p>
         </motion.div>
       </div>

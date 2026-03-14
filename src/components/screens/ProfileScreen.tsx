@@ -82,24 +82,34 @@ export default function ProfileScreen() {
   return (
     <div className="flex flex-col h-full bg-[#F8F9FB] overflow-hidden">
       {/* Header */}
-      <div className="bg-[#1B2E4B] px-5 pt-12 pb-6 rounded-b-[32px]">
+      <div className="bg-[#1B2E4B] px-5 pt-12 pb-8 rounded-b-[32px]">
         <motion.div
           initial={{ y: -10, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           className="flex items-center gap-4 z-10 relative"
         >
-          <AvatarBadge
-            initials={currentUser.avatar || currentUser.name.slice(0, 2)}
-            size="lg"
-            className="ring-2 ring-white/20"
-          />
-          <div>
+          <div className="relative">
+            <AvatarBadge
+              initials={currentUser.avatar || currentUser.name.slice(0, 2)}
+              size="lg"
+              className="ring-2 ring-white/20 w-16 h-16 text-xl"
+            />
+            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-400 border-2 border-[#1B2E4B] flex items-center justify-center">
+              <span className="text-white text-[8px] font-bold">✓</span>
+            </div>
+          </div>
+          <div className="flex-1">
             <h2 className="text-white text-xl font-bold">
               {currentUser.name}
             </h2>
             <p className="text-white/60 text-sm">
               {currentUser.phone_number}
             </p>
+            <div className="flex items-center gap-1 mt-1">
+              <span className="text-emerald-400 text-[10px] font-semibold">✓ Verified</span>
+              <span className="text-white/20 text-[10px]">·</span>
+              <span className="text-white/40 text-[10px]">Member since {new Date(currentUser.created_at).toLocaleDateString("en-US", { month: "short", year: "numeric" })}</span>
+            </div>
           </div>
         </motion.div>
       </div>
@@ -121,7 +131,7 @@ export default function ProfileScreen() {
               <p className={`text-2xl font-bold ${stat.color}`}>
                 {stat.value}
               </p>
-              <p className="text-gray-400 text-[10px] mt-0.5">
+              <p className="text-gray-400 text-[10px] mt-0.5 leading-tight">
                 {stat.label}
               </p>
             </div>
@@ -152,33 +162,6 @@ export default function ProfileScreen() {
             }}
             onRefresh={refreshSubscription}
           />
-        </motion.div>
-
-        {/* Account info */}
-        <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="bg-white border border-gray-100 rounded-2xl p-4 space-y-3 shadow-sm"
-        >
-          <h3 className="text-gray-400 text-xs font-semibold uppercase tracking-wider">
-            Account
-          </h3>
-          <div className="flex justify-between">
-            <span className="text-gray-400 text-sm">Member since</span>
-            <span className="text-gray-900 text-sm font-semibold">
-              {new Date(currentUser.created_at).toLocaleDateString("en-US", {
-                month: "long",
-                year: "numeric",
-              })}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400 text-sm">Verified phone</span>
-            <span className="text-emerald-600 text-sm font-semibold">
-              ✓ Verified
-            </span>
-          </div>
         </motion.div>
 
         {/* Invite Friends Section */}

@@ -158,15 +158,20 @@ export default function LoanDetailsScreen() {
 
       {/* Header */}
       <div className="flex items-center gap-3 px-5 pt-12 pb-4 bg-white border-b border-gray-100">
-        <button onClick={() => navigate("loans")} className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+        <button onClick={() => navigate("loans")} className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center active:scale-95 transition-transform">
           <ArrowLeft className="w-5 h-5 text-gray-500" />
         </button>
-        <h2 className="text-gray-900 font-bold text-base flex-1">
-          Loan Details
-        </h2>
+        <div className="flex-1">
+          <h2 className="text-gray-900 font-bold text-base">
+            Loan Details
+          </h2>
+          <p className="text-gray-400 text-xs">
+            {isLender ? "You lent to" : "You borrowed from"} {counterparty}
+          </p>
+        </div>
         <button
           onClick={handleExportReport}
-          className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center relative group"
+          className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center relative group active:scale-95 transition-transform"
           title="Export report"
         >
           <Download className="w-4.5 h-4.5 text-gray-500" />
@@ -259,19 +264,26 @@ export default function LoanDetailsScreen() {
 
           {/* Progress bar */}
           <div>
-            <div className="flex justify-between text-xs text-gray-400 mb-1.5">
+            <div className="flex justify-between text-xs text-gray-400 mb-2">
               <span>{confirmedPayments.length} of {loan.number_of_payments} payments</span>
-              <span className="font-semibold">{Math.round(progress)}%</span>
+              <span className={`font-bold ${progress === 100 ? "text-emerald-600" : "text-[#1B2E4B]"}`}>{Math.round(progress)}%</span>
             </div>
-            <div className="h-3 rounded-full bg-gray-100 overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${progress}%` }}
-                transition={{ delay: 0.4, duration: 0.8, ease: "easeOut" }}
-                className={`h-full rounded-full ${
-                  progress === 100 ? "bg-emerald-500" : "bg-[#1B2E4B]"
-                }`}
-              />
+            {/* Segmented progress bar */}
+            <div className="flex gap-1">
+              {Array.from({ length: loan.number_of_payments }).map((_, i) => {
+                const isConfirmed = i < confirmedPayments.length;
+                const isPending = !isConfirmed && payments.some((p, pi) => p.status === "pending_confirmation" && pi === i);
+                return (
+                  <div
+                    key={i}
+                    className={`h-2.5 flex-1 rounded-full transition-all ${
+                      isConfirmed
+                        ? progress === 100 ? "bg-emerald-500" : "bg-[#1B2E4B]"
+                        : "bg-gray-100"
+                    }`}
+                  />
+                );
+              })}
             </div>
           </div>
 

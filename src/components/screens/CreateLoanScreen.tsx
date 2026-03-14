@@ -485,6 +485,22 @@ export default function CreateLoanScreen() {
                     style={{ fontFamily: "'JetBrains Mono', monospace" }}
                   />
                 </div>
+                {/* Quick amount presets */}
+                <div className="flex gap-2 mt-2">
+                  {[50, 100, 200, 500].map((preset) => (
+                    <button
+                      key={preset}
+                      onClick={() => setAmount(String(preset))}
+                      className={`flex-1 h-9 rounded-xl text-xs font-semibold transition-all active:scale-95 ${
+                        amount === String(preset)
+                          ? "bg-[#1B2E4B] text-white"
+                          : "bg-white border border-gray-200 text-gray-500 hover:border-[#1B2E4B]/30"
+                      }`}
+                    >
+                      ${preset}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Interest rate */}
