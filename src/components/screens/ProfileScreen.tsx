@@ -26,6 +26,8 @@ export default function ProfileScreen() {
     activeLoansCount,
     startCheckout,
     openBillingPortal,
+    cancelSubscription,
+    refreshSubscription,
     isCheckoutLoading,
   } = useSubscription(currentUser, loans);
   const [showSecurityLog, setShowSecurityLog] = useState(false);
@@ -139,6 +141,16 @@ export default function ProfileScreen() {
             activeLoansCount={activeLoansCount}
             onUpgrade={() => setShowUpgradePrompt(true)}
             onManage={() => openBillingPortal()}
+            onCancel={async () => {
+              const success = await cancelSubscription();
+              if (success) {
+                toast.success("Subscription canceled. You'll keep premium access until the end of your billing period.", { duration: 5000 });
+              } else {
+                toast.error("Failed to cancel subscription. Please try again.");
+              }
+              return success;
+            }}
+            onRefresh={refreshSubscription}
           />
         </motion.div>
 

@@ -125,18 +125,24 @@ Deno.serve(async (req) => {
         throw new Error(subscription.error.message);
       }
 
+      const periodEnd = subscription.current_period_end
+        ? new Date(subscription.current_period_end * 1000).toISOString()
+        : null;
+
       await supabase
         .from("users")
-        .update({ subscription_status: "canceled" })
+        .update({
+          subscription_status: "canceled",
+          subscription_expiry: periodEnd,
+        })
         .eq("id", user_id);
 
       return new Response(
         JSON.stringify({
           success: true,
           message: "Subscription will be canceled at the end of the billing period",
-          cancel_at: subscription.cancel_at
-            ? new Date(subscription.cancel_at * 1000).toISOString()
-            : null,
+          cancel_at: periodEnd,
+          access_until: periodEnd,
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },

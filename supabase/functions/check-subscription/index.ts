@@ -55,6 +55,7 @@ Deno.serve(async (req) => {
     // Check if subscription has expired (local check)
     let isPremium = user.is_premium ?? false;
     let subscriptionStatus = user.subscription_status ?? "free";
+    let subscriptionExpiry = user.subscription_expiry;
 
     if (user.subscription_expiry) {
       const expiry = new Date(user.subscription_expiry);
@@ -69,16 +70,17 @@ Deno.serve(async (req) => {
           );
 
           if (stripeSub.status !== "active" && stripeSub.status !== "trialing") {
-            // Subscription really expired — downgrade
+            // Subscription really expired — downgrade to free
             isPremium = false;
-            subscriptionStatus = "canceled";
+            subscriptionStatus = "free";
 
             await supabase
               .from("users")
               .update({
                 is_premium: false,
-                subscription_status: "canceled",
+                subscription_status: "free",
                 subscription_plan: null,
+                subscription_id: null,
               })
               .eq("id", user_id);
           } else {
@@ -88,6 +90,7 @@ Deno.serve(async (req) => {
             ).toISOString();
             isPremium = true;
             subscriptionStatus = "active";
+            subscriptionExpiry = newExpiry;
 
             await supabase
               .from("users")
@@ -99,7 +102,7 @@ Deno.serve(async (req) => {
               .eq("id", user_id);
           }
         } else {
-          // No subscription_id but marked premium and expired — downgrade
+          // No subscription_id but marked premium and expired — downgrade to free
           isPremium = false;
           subscriptionStatus = "free";
 
@@ -108,9 +111,13 @@ Deno.serve(async (req) => {
             .update({
               is_premium: false,
               subscription_status: "free",
+              subscription_plan: null,
             })
             .eq("id", user_id);
         }
+      } else if (expiry >= now && subscriptionStatus === "canceled" && isPremium) {
+        // Canceled but still within billing period — keep premium access
+        // isPremium stays true, status stays "canceled"
       }
     }
 
@@ -119,7 +126,7 @@ Deno.serve(async (req) => {
         is_premium: isPremium,
         subscription_status: subscriptionStatus,
         subscription_plan: user.subscription_plan,
-        subscription_expiry: user.subscription_expiry,
+        subscription_expiry: subscriptionExpiry,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );

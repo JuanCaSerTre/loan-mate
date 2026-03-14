@@ -2,12 +2,12 @@ import { motion } from "framer-motion";
 import { Plus, AlertTriangle, ArrowUpRight, ArrowDownLeft, BookUser, Share2, Copy, Crown } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { useInvitations } from "@/hooks/useInvitations";
-import { useSubscription } from "@/hooks/useSubscription";
+import { usePaywall } from "@/hooks/usePaywall";
 import LoanCard from "@/components/shared/LoanCard";
 import AvatarBadge from "@/components/shared/AvatarBadge";
-import UpgradePrompt from "@/components/shared/UpgradePrompt";
+import PaywallModal from "@/components/shared/PaywallModal";
 import { toast } from "sonner";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { trackComputedMetrics, trackDailyActiveUser } from "@/services/analyticsService";
 import { SUBSCRIPTION } from "@/config/constants";
 
@@ -28,14 +28,16 @@ export default function DashboardScreen() {
   const {
     isPremium,
     hasReachedFreeLimit,
-    canCreateLoan,
     activeLoansCount,
     remainingFreeLoans,
     startCheckout,
     isCheckoutLoading,
-  } = useSubscription(currentUser, loans);
-
-  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+    isPaywallOpen,
+    paywallTrigger,
+    showPaywall,
+    closePaywall,
+    guardCreateLoan,
+  } = usePaywall(currentUser, loans);
 
   // Track computed metrics and DAU each time the dashboard is visited
   useEffect(() => {
@@ -224,7 +226,7 @@ export default function DashboardScreen() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.19 }}
-            onClick={() => setShowUpgradePrompt(true)}
+            onClick={() => showPaywall("loan_limit")}
             className="w-full flex items-center gap-3 bg-gradient-to-r from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl px-4 py-3 active:scale-[0.98] transition-transform"
           >
             <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
@@ -295,10 +297,8 @@ export default function DashboardScreen() {
         animate={{ scale: 1, opacity: 1 }}
         transition={{ delay: 0.5, type: "spring", stiffness: 200 }}
         onClick={() => {
-          if (canCreateLoan) {
+          if (guardCreateLoan()) {
             navigate("create-loan");
-          } else {
-            setShowUpgradePrompt(true);
           }
         }}
         className="absolute bottom-20 right-5 w-14 h-14 rounded-full bg-[#1B2E4B] shadow-lg shadow-[#1B2E4B]/30 flex items-center justify-center z-20 active:scale-95 transition-transform"
@@ -306,15 +306,16 @@ export default function DashboardScreen() {
         <Plus className="w-7 h-7 text-white" strokeWidth={2.5} />
       </motion.button>
 
-      {/* Upgrade Prompt */}
-      <UpgradePrompt
-        isOpen={showUpgradePrompt}
-        onClose={() => setShowUpgradePrompt(false)}
+      {/* Paywall Modal */}
+      <PaywallModal
+        isOpen={isPaywallOpen}
+        onClose={closePaywall}
         onUpgrade={async (plan) => {
           await startCheckout(plan);
-          setShowUpgradePrompt(false);
+          closePaywall();
         }}
         isLoading={isCheckoutLoading}
+        trigger={paywallTrigger}
         activeLoansCount={activeLoansCount}
       />
     </div>

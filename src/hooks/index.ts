@@ -11,3 +11,4 @@ export { useCountdown } from "./useCountdown";
 export { useContacts } from "./useContacts";
 export { useInvitations } from "./useInvitations";
 export { useIsMobile } from "./use-mobile";
+export { usePaywall } from "./usePaywall";

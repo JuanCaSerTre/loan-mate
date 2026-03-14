@@ -18,6 +18,7 @@ import {
   trackLoanCompleted,
 } from "@/services/analyticsService";
 import * as db from "@/services/api/supabaseDataService";
+import { setupPaymentReminderSchedule } from "@/services/paymentReminderScheduler";
 
 type AppScreen =
   | "splash"

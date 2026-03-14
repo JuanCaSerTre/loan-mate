@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Search, Check, BookUser, ChevronRight, Users, CalendarDays, TrendingUp, Wallet, Clock, ShieldAlert, ShieldCheck, AlertTriangle, Crown } from "lucide-react";
 import { useApp } from "@/context/AppContext";
@@ -6,11 +6,12 @@ import { PaymentFrequency } from "@/types/loan";
 import AvatarBadge from "@/components/shared/AvatarBadge";
 import { calculateTotalAmount, calculateDueDate, generatePaymentSchedule } from "@/lib/calculations";
 import { useContacts } from "@/hooks/useContacts";
-import { useSubscription } from "@/hooks/useSubscription";
-import UpgradePrompt from "@/components/shared/UpgradePrompt";
+import { usePaywall } from "@/hooks/usePaywall";
+import PaywallModal from "@/components/shared/PaywallModal";
 import { LoanMateFriend } from "@/types/contact";
 import { SUBSCRIPTION } from "@/config/constants";
 import { toast } from "sonner";
+import * as db from "@/services/api/supabaseDataService";
 
 type Step = 1 | 2 | 3;
 
@@ -22,7 +23,11 @@ export default function CreateLoanScreen() {
     activeLoansCount,
     startCheckout,
     isCheckoutLoading,
-  } = useSubscription(currentUser, loans);
+    isPaywallOpen,
+    paywallTrigger,
+    guardCreateLoan,
+    closePaywall,
+  } = usePaywall(currentUser, loans);
   const [step, setStep] = useState<Step>(1);
   const [borrowerPhone, setBorrowerPhone] = useState("");
   const [foundUser, setFoundUser] = useState<ReturnType<typeof findUserByPhone>>(undefined);
@@ -36,7 +41,7 @@ export default function CreateLoanScreen() {
   const [showSchedule, setShowSchedule] = useState(false);
   const [securityError, setSecurityError] = useState<string | null>(null);
   const [securityWarnings, setSecurityWarnings] = useState<string[]>([]);
-  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const [isSearchingUser, setIsSearchingUser] = useState(false);
 
   // Contact syncing for the inline contact picker
   const {
@@ -88,24 +93,50 @@ export default function CreateLoanScreen() {
     return generatePaymentSchedule(parsedAmount, parsedRate, parsedPayments, frequency, startDate);
   }, [parsedAmount, parsedRate, parsedPayments, frequency, startDate]);
 
-  const handleFindBorrower = () => {
+  const handleFindBorrower = async () => {
     if (!borrowerPhone.trim()) {
       setSearchError("Enter a phone number");
       return;
     }
-    const user = findUserByPhone(borrowerPhone);
-    if (!user) {
-      setSearchError("No user found with this number");
+    
+    setIsSearchingUser(true);
+    try {
+      // First try local lookup
+      const user = findUserByPhone(borrowerPhone);
+      if (user) {
+        if (user.id === currentUser?.id) {
+          setSearchError("You can't create a loan with yourself");
+          setFoundUser(undefined);
+        } else {
+          setFoundUser(user);
+          setSearchError("");
+        }
+        return;
+      }
+
+      // If not found locally, search Supabase
+      const supabaseUser = await db.getUserByPhone(borrowerPhone);
+      if (!supabaseUser) {
+        setSearchError("No user found with this number");
+        setFoundUser(undefined);
+        return;
+      }
+      
+      if (supabaseUser.id === currentUser?.id) {
+        setSearchError("You can't create a loan with yourself");
+        setFoundUser(undefined);
+        return;
+      }
+
+      setFoundUser(supabaseUser);
+      setSearchError("");
+    } catch (err) {
+      console.error("Error searching for user:", err);
+      setSearchError("Error searching for user");
       setFoundUser(undefined);
-      return;
+    } finally {
+      setIsSearchingUser(false);
     }
-    if (user.id === currentUser?.id) {
-      setSearchError("You can't create a loan with yourself");
-      setFoundUser(undefined);
-      return;
-    }
-    setFoundUser(user);
-    setSearchError("");
   };
 
   const handleSelectContact = (friend: LoanMateFriend) => {
@@ -121,9 +152,8 @@ export default function CreateLoanScreen() {
   const handleSubmit = async () => {
     if (!foundUser || !currentUser) return;
 
-    // Check free loan limit
-    if (!canCreateLoan) {
-      setShowUpgradePrompt(true);
+    // Check free loan limit via paywall guard
+    if (!guardCreateLoan()) {
       return;
     }
 
@@ -225,7 +255,7 @@ export default function CreateLoanScreen() {
       {hasReachedFreeLimit && (
         <div className="mx-5 mb-2">
           <button
-            onClick={() => setShowUpgradePrompt(true)}
+            onClick={() => guardCreateLoan()}
             className="w-full flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5 active:scale-[0.99] transition-transform"
           >
             <Crown className="w-4 h-4 text-amber-600 flex-shrink-0" />
@@ -360,9 +390,14 @@ export default function CreateLoanScreen() {
                 />
                 <button
                   onClick={handleFindBorrower}
-                  className="h-14 w-14 rounded-2xl bg-[#1B2E4B] flex items-center justify-center flex-shrink-0"
+                  disabled={isSearchingUser}
+                  className="h-14 w-14 rounded-2xl bg-[#1B2E4B] flex items-center justify-center flex-shrink-0 disabled:opacity-50"
                 >
-                  <Search className="w-5 h-5 text-white" />
+                  {isSearchingUser ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Search className="w-5 h-5 text-white" />
+                  )}
                 </button>
               </div>
 
@@ -840,15 +875,16 @@ export default function CreateLoanScreen() {
         </AnimatePresence>
       </div>
 
-      {/* Free Limit Upgrade Prompt */}
-      <UpgradePrompt
-        isOpen={showUpgradePrompt}
-        onClose={() => setShowUpgradePrompt(false)}
+      {/* Paywall Modal */}
+      <PaywallModal
+        isOpen={isPaywallOpen}
+        onClose={closePaywall}
         onUpgrade={async (plan) => {
           await startCheckout(plan);
-          setShowUpgradePrompt(false);
+          closePaywall();
         }}
         isLoading={isCheckoutLoading}
+        trigger={paywallTrigger}
         activeLoansCount={activeLoansCount}
       />
     </div>

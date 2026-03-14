@@ -1,7 +1,9 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Plus, Check, X, Clock, DollarSign, Wallet, FileText } from "lucide-react";
+import { ArrowLeft, Plus, Check, X, Clock, DollarSign, Wallet, FileText, Download, Crown } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import AvatarBadge from "@/components/shared/AvatarBadge";
+import PaywallModal from "@/components/shared/PaywallModal";
+import { usePaywall } from "@/hooks/usePaywall";
 import { Payment } from "@/types/loan";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
@@ -15,11 +17,22 @@ const statusIcons = {
 export default function LoanDetailsScreen() {
   const {
     selectedLoanId, getLoanById, getPaymentsForLoan, getLoanComputed,
-    navigate, currentUser, confirmPayment, rejectPayment, selectLoan,
+    navigate, currentUser, confirmPayment, rejectPayment, selectLoan, loans,
   } = useApp();
   const [showCelebration, setShowCelebration] = useState(false);
   const [confirmingPaymentId, setConfirmingPaymentId] = useState<string | null>(null);
   const prevStatusRef = useRef<string | null>(null);
+
+  const {
+    isPremium,
+    guardExport,
+    isPaywallOpen,
+    paywallTrigger,
+    closePaywall,
+    startCheckout,
+    isCheckoutLoading,
+    activeLoansCount,
+  } = usePaywall(currentUser, loans);
 
   const loan = selectedLoanId ? getLoanById(selectedLoanId) : null;
   const loanStatus = loan?.status ?? null;
@@ -78,6 +91,43 @@ export default function LoanDetailsScreen() {
   const pendingPayments = payments.filter((p) => p.status === "pending_confirmation");
   const rejectedPayments = payments.filter((p) => p.status === "rejected");
 
+  const handleExportReport = () => {
+    if (!guardExport()) return;
+
+    // Premium user — generate and download CSV report
+    const csvRows = [
+      ["Payment #", "Date", "Amount", "Status", "Note"],
+      ...payments.map((p, i) => [
+        String(i + 1),
+        new Date(p.payment_date).toLocaleDateString("en-US"),
+        `$${p.amount.toFixed(2)}`,
+        p.status,
+        p.note || "",
+      ]),
+      [],
+      ["Loan Summary"],
+      ["Counterparty", counterparty],
+      ["Total Amount", `$${loan.total_amount.toFixed(2)}`],
+      ["Paid", `$${confirmedAmount.toFixed(2)}`],
+      ["Remaining", `$${remainingBalance.toFixed(2)}`],
+      ["Progress", `${Math.round(progress)}%`],
+      ["Status", loan.status],
+    ];
+
+    const csvContent = csvRows.map((r) => r.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `loan-report-${loan.loan_id.slice(0, 8)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    toast.success("Report exported!", {
+      description: "CSV report downloaded successfully",
+    });
+  };
+
   return (
     <div className="relative flex flex-col h-full bg-[#F8F9FB] overflow-hidden">
       {/* Celebration overlay */}
@@ -114,6 +164,18 @@ export default function LoanDetailsScreen() {
         <h2 className="text-gray-900 font-bold text-base flex-1">
           Loan Details
         </h2>
+        <button
+          onClick={handleExportReport}
+          className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center relative group"
+          title="Export report"
+        >
+          <Download className="w-4.5 h-4.5 text-gray-500" />
+          {!isPremium && (
+            <div className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-amber-400 flex items-center justify-center">
+              <Crown className="w-2.5 h-2.5 text-white" />
+            </div>
+          )}
+        </button>
         <div className={`px-3 py-1 rounded-full border text-xs font-semibold uppercase ${statusColors[loan.status]}`}>
           {loan.status}
         </div>
@@ -383,6 +445,39 @@ export default function LoanDetailsScreen() {
             </div>
           </motion.div>
         )}
+
+        {/* Export Report Card — shown for completed/non-active loans */}
+        {(loan.status === "completed" || (loan.status !== "active")) && payments.length > 0 && (
+          <motion.button
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+            onClick={handleExportReport}
+            className="w-full flex items-center gap-3 bg-white border border-gray-100 rounded-2xl px-4 py-3.5 shadow-sm active:scale-[0.98] transition-transform"
+          >
+            <div className="w-10 h-10 rounded-xl bg-[#1B2E4B]/5 flex items-center justify-center flex-shrink-0">
+              <Download className="w-5 h-5 text-[#1B2E4B]" />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-gray-900 text-sm font-semibold">
+                Export Loan Report
+              </p>
+              <p className="text-gray-400 text-xs">
+                Download CSV with all payment details
+              </p>
+            </div>
+            {!isPremium ? (
+              <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200">
+                <Crown className="w-3 h-3 text-amber-600" />
+                <span className="text-amber-700 text-[10px] font-bold">PRO</span>
+              </div>
+            ) : (
+              <div className="w-7 h-7 rounded-full bg-[#1B2E4B] flex items-center justify-center">
+                <span className="text-white text-xs font-bold">→</span>
+              </div>
+            )}
+          </motion.button>
+        )}
       </div>
 
       {/* CTA */}
@@ -393,18 +488,43 @@ export default function LoanDetailsScreen() {
           transition={{ delay: 0.4 }}
           className="px-5 pb-6 bg-white pt-4 border-t border-gray-100"
         >
-          <button
-            onClick={() => {
-              selectLoan(loan.loan_id);
-              navigate("register-payment");
-            }}
-            className="w-full h-14 rounded-2xl bg-[#1B2E4B] text-white font-semibold text-base flex items-center justify-center gap-2 active:scale-[0.98] transition-transform shadow-lg shadow-[#1B2E4B]/20"
-          >
-            <Plus className="w-5 h-5" strokeWidth={2.5} />
-            Register Payment
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={handleExportReport}
+              className="h-14 px-4 rounded-2xl bg-gray-100 text-gray-600 font-semibold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform relative"
+            >
+              <Download className="w-4 h-4" />
+              Export
+              {!isPremium && (
+                <Crown className="w-3 h-3 text-amber-500" />
+              )}
+            </button>
+            <button
+              onClick={() => {
+                selectLoan(loan.loan_id);
+                navigate("register-payment");
+              }}
+              className="flex-1 h-14 rounded-2xl bg-[#1B2E4B] text-white font-semibold text-base flex items-center justify-center gap-2 active:scale-[0.98] transition-transform shadow-lg shadow-[#1B2E4B]/20"
+            >
+              <Plus className="w-5 h-5" strokeWidth={2.5} />
+              Register Payment
+            </button>
+          </div>
         </motion.div>
       )}
+
+      {/* Paywall Modal */}
+      <PaywallModal
+        isOpen={isPaywallOpen}
+        onClose={closePaywall}
+        onUpgrade={async (plan) => {
+          await startCheckout(plan);
+          closePaywall();
+        }}
+        isLoading={isCheckoutLoading}
+        trigger={paywallTrigger}
+        activeLoansCount={activeLoansCount}
+      />
     </div>
   );
 }

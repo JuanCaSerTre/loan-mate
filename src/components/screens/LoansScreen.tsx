@@ -1,13 +1,27 @@
 import { motion } from "framer-motion";
-import { Plus } from "lucide-react";
+import { Plus, Download, Crown } from "lucide-react";
 import { useApp } from "@/context/AppContext";
+import { usePaywall } from "@/hooks/usePaywall";
 import LoanCard from "@/components/shared/LoanCard";
+import PaywallModal from "@/components/shared/PaywallModal";
 import { useState } from "react";
+import { toast } from "sonner";
 
 type Filter = "all" | "lent" | "borrowed" | "active" | "completed";
 
 export default function LoansScreen() {
-  const { currentUser, loans, navigate } = useApp();
+  const { currentUser, loans, payments, navigate } = useApp();
+  const {
+    isPremium,
+    guardCreateLoan,
+    guardExport,
+    isPaywallOpen,
+    paywallTrigger,
+    closePaywall,
+    startCheckout,
+    isCheckoutLoading,
+    activeLoansCount,
+  } = usePaywall(currentUser, loans);
   const [filter, setFilter] = useState<Filter>("all");
 
   const myLoans = loans.filter(
@@ -31,6 +45,47 @@ export default function LoansScreen() {
     { id: "completed", label: "Done" },
   ];
 
+  const handleExportAll = () => {
+    if (!guardExport()) return;
+
+    // Premium user — generate and download CSV of all loans
+    const csvRows = [
+      ["Loan ID", "Counterparty", "Role", "Amount", "Total", "Interest", "Status", "Payments Made", "Start Date", "Due Date"],
+      ...myLoans.map((l) => {
+        const isLender = l.lender_id === currentUser?.id;
+        const loanPayments = payments.filter(
+          (p) => p.loan_id === l.loan_id && p.status === "confirmed"
+        );
+        const paidAmount = loanPayments.reduce((s, p) => s + p.amount, 0);
+        return [
+          l.loan_id.slice(0, 8),
+          isLender ? l.borrower_name : l.lender_name,
+          isLender ? "Lender" : "Borrower",
+          `$${l.loan_amount.toFixed(2)}`,
+          `$${l.total_amount.toFixed(2)}`,
+          `${l.interest_rate}%`,
+          l.status,
+          `${loanPayments.length}/${l.number_of_payments} ($${paidAmount.toFixed(2)})`,
+          new Date(l.start_date).toLocaleDateString("en-US"),
+          new Date(l.due_date).toLocaleDateString("en-US"),
+        ];
+      }),
+    ];
+
+    const csvContent = csvRows.map((r) => r.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `all-loans-report-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    toast.success("Report exported!", {
+      description: `${myLoans.length} loans exported to CSV`,
+    });
+  };
+
   return (
     <div className="flex flex-col h-full bg-[#F8F9FB] overflow-hidden">
       {/* Header */}
@@ -43,9 +98,21 @@ export default function LoansScreen() {
           <h1 className="text-2xl font-bold text-gray-900">
             My Loans
           </h1>
-          <span className="text-gray-400 text-sm">
-            {myLoans.length} total
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportAll}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-100 text-gray-600 text-xs font-semibold hover:bg-gray-200 active:scale-[0.97] transition-all relative"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export
+              {!isPremium && (
+                <Crown className="w-3 h-3 text-amber-500" />
+              )}
+            </button>
+            <span className="text-gray-400 text-sm">
+              {myLoans.length} total
+            </span>
+          </div>
         </motion.div>
 
         {/* Filter chips */}
@@ -95,11 +162,28 @@ export default function LoansScreen() {
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
         transition={{ delay: 0.4, type: "spring" }}
-        onClick={() => navigate("create-loan")}
+        onClick={() => {
+          if (guardCreateLoan()) {
+            navigate("create-loan");
+          }
+        }}
         className="absolute bottom-20 right-5 w-14 h-14 rounded-full bg-[#1B2E4B] shadow-lg shadow-[#1B2E4B]/30 flex items-center justify-center z-20 active:scale-95 transition-transform"
       >
         <Plus className="w-7 h-7 text-white" strokeWidth={2.5} />
       </motion.button>
+
+      {/* Paywall Modal */}
+      <PaywallModal
+        isOpen={isPaywallOpen}
+        onClose={closePaywall}
+        onUpgrade={async (plan) => {
+          await startCheckout(plan);
+          closePaywall();
+        }}
+        isLoading={isCheckoutLoading}
+        trigger={paywallTrigger}
+        activeLoansCount={activeLoansCount}
+      />
     </div>
   );
 }
