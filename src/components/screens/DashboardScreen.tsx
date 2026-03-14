@@ -1,13 +1,14 @@
 import { motion } from "framer-motion";
-import { Plus, AlertTriangle, ArrowUpRight, ArrowDownLeft, BookUser, Share2, Copy, Crown } from "lucide-react";
+import { Plus, AlertTriangle, ArrowUpRight, ArrowDownLeft, BookUser, Share2, Copy, Crown, RefreshCw } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { useInvitations } from "@/hooks/useInvitations";
 import { usePaywall } from "@/hooks/usePaywall";
 import LoanCard from "@/components/shared/LoanCard";
 import AvatarBadge from "@/components/shared/AvatarBadge";
 import PaywallModal from "@/components/shared/PaywallModal";
+import { DashboardSkeleton, LoanCardSkeleton } from "@/components/shared/SkeletonLoader";
 import { toast } from "sonner";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { trackComputedMetrics, trackDailyActiveUser } from "@/services/analyticsService";
 import { SUBSCRIPTION } from "@/config/constants";
 
@@ -23,6 +24,8 @@ export default function DashboardScreen() {
     getPendingActions,
     getPendingLoanRequests,
     getPendingPaymentConfirmations,
+    isLoadingData,
+    refreshData,
   } = useApp();
 
   const {
@@ -38,6 +41,8 @@ export default function DashboardScreen() {
     closePaywall,
     guardCreateLoan,
   } = usePaywall(currentUser, loans);
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Track computed metrics and DAU each time the dashboard is visited
   useEffect(() => {
@@ -73,11 +78,24 @@ export default function DashboardScreen() {
     }
   };
 
+  const handleRefresh = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    await refreshData();
+    setIsRefreshing(false);
+    toast.success("Data refreshed", { duration: 1500 });
+  };
+
   const activeLoans = loans.filter(
     (l) =>
       (l.lender_id === currentUser?.id || l.borrower_id === currentUser?.id) &&
       (l.status === "active" || l.status === "pending")
   );
+
+  // Show skeleton while initial data loads
+  if (isLoadingData && loans.length === 0) {
+    return <DashboardSkeleton />;
+  }
 
   const handlePendingBannerTap = () => {
     if (pendingLoanRequests.length > 0) {
@@ -107,11 +125,26 @@ export default function DashboardScreen() {
               {currentUser?.name.split(" ")[0]}
             </h2>
           </div>
-          <AvatarBadge
-            initials={currentUser?.avatar || currentUser?.name.slice(0, 2) || "U"}
-            size="md"
-            className="ring-2 ring-white/20"
-          />
+          <div className="flex items-center gap-2">
+            {/* Refresh button */}
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center active:scale-95 transition-transform"
+            >
+              <motion.div
+                animate={isRefreshing ? { rotate: 360 } : { rotate: 0 }}
+                transition={isRefreshing ? { duration: 1, repeat: Infinity, ease: "linear" } : {}}
+              >
+                <RefreshCw className="w-4 h-4 text-white/70" />
+              </motion.div>
+            </button>
+            <AvatarBadge
+              initials={currentUser?.avatar || currentUser?.name.slice(0, 2) || "U"}
+              size="md"
+              className="ring-2 ring-white/20"
+            />
+          </div>
         </motion.div>
 
         {/* Balance summary cards */}

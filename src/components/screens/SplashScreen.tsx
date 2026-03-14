@@ -57,7 +57,7 @@ export default function SplashScreen() {
             JU<span className="text-[#00C9A7]">CA</span>
           </h1>
           <p className="text-white/50 text-sm mt-2 font-medium">
-            Acuerdos claros entre personas de confianza.
+            Loans between friends, made honest.
           </p>
         </motion.div>
 

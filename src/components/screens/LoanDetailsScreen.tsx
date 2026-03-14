@@ -1,8 +1,9 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Plus, Check, X, Clock, DollarSign, Wallet, FileText, Download, Crown } from "lucide-react";
+import { ArrowLeft, Plus, Check, X, Clock, DollarSign, Wallet, FileText, Download, Crown, RefreshCw } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import AvatarBadge from "@/components/shared/AvatarBadge";
 import PaywallModal from "@/components/shared/PaywallModal";
+import { LoanDetailsSkeleton } from "@/components/shared/SkeletonLoader";
 import { usePaywall } from "@/hooks/usePaywall";
 import { Payment } from "@/types/loan";
 import { useState, useEffect, useRef } from "react";
@@ -49,7 +50,7 @@ export default function LoanDetailsScreen() {
     prevStatusRef.current = loanStatus;
   }, [loanStatus]);
 
-  if (!loan) return null;
+  if (!loan) return <LoanDetailsSkeleton />;
 
   const payments = getPaymentsForLoan(loan.loan_id);
   const computed = getLoanComputed(loan.loan_id);

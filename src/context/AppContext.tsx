@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { User, Loan, Payment, Notification } from "@/types/loan";
 import {
   calculateTotalAmount,
@@ -19,6 +19,7 @@ import {
 } from "@/services/analyticsService";
 import * as db from "@/services/api/supabaseDataService";
 import { setupPaymentReminderSchedule } from "@/services/paymentReminderScheduler";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 
 type AppScreen =
   | "splash"
@@ -39,6 +40,7 @@ interface AppState {
   currentScreen: AppScreen;
   currentUser: User | null;
   isAuthenticated: boolean;
+  isLoadingData: boolean;
   loans: Loan[];
   payments: Payment[];
   notifications: Notification[];
@@ -66,6 +68,8 @@ interface AppContextType extends AppState {
   acceptTerms: () => void;
   selectLoan: (loanId: string) => void;
   selectPayment: (paymentId: string) => void;
+  /** Reload all data from Supabase */
+  refreshData: () => Promise<void>;
   createLoan: (params: {
     borrower: User;
     amount: number;
@@ -126,6 +130,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     currentScreen: "splash",
     currentUser: null,
     isAuthenticated: false,
+    isLoadingData: false,
     loans: [],
     payments: [],
     notifications: [],
@@ -180,6 +185,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ...prev,
       currentUser: user,
       isAuthenticated: true,
+      isLoadingData: true,
       termsAcceptedAt: storedAcceptance,
       currentScreen: storedAcceptance ? "dashboard" : "terms",
     }));
@@ -204,10 +210,57 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           payments,
           notifications,
           users: finalUsers,
+          isLoadingData: false,
         }));
       } catch (err) {
         console.error("[login] Failed to load data from Supabase:", err);
+        setState((prev) => ({ ...prev, isLoadingData: false }));
       }
+    }
+  }, []);
+
+  /** Reload all data from Supabase (pull-to-refresh / manual refresh) */
+  const refreshData = useCallback(async () => {
+    setState((prev) => {
+      if (!prev.currentUser) return prev;
+      return { ...prev, isLoadingData: true };
+    });
+
+    let userId: string | null = null;
+    setState((prev) => {
+      userId = prev.currentUser?.id ?? null;
+      return prev;
+    });
+
+    if (!userId) {
+      setState((prev) => ({ ...prev, isLoadingData: false }));
+      return;
+    }
+
+    try {
+      const [loans, payments, notifications, allUsers] = await Promise.all([
+        db.getLoansForUser(userId),
+        db.getPaymentsForUser(userId),
+        db.getNotificationsForUser(userId),
+        db.getAllUsers(),
+      ]);
+
+      setState((prev) => {
+        if (!prev.currentUser) return { ...prev, isLoadingData: false };
+        const userInList = allUsers.some((u) => u.id === prev.currentUser!.id);
+        const finalUsers = userInList ? allUsers : [prev.currentUser, ...allUsers];
+        return {
+          ...prev,
+          loans,
+          payments,
+          notifications,
+          users: finalUsers,
+          isLoadingData: false,
+        };
+      });
+    } catch (err) {
+      console.error("[refreshData] Failed:", err);
+      setState((prev) => ({ ...prev, isLoadingData: false }));
     }
   }, []);
 
@@ -1081,6 +1134,54 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return securityService.getActivityLog();
   }, []);
 
+  // ─── Realtime Sync Handlers ────────────────────────────────────
+  const handleLoanChange = useCallback((loan: Loan, eventType: "INSERT" | "UPDATE") => {
+    setState((prev) => {
+      const exists = prev.loans.some((l) => l.loan_id === loan.loan_id);
+      const loans = exists
+        ? prev.loans.map((l) => (l.loan_id === loan.loan_id ? loan : l))
+        : [loan, ...prev.loans];
+      return { ...prev, loans };
+    });
+  }, []);
+
+  const handlePaymentChange = useCallback((payment: Payment, eventType: "INSERT" | "UPDATE") => {
+    setState((prev) => {
+      const exists = prev.payments.some((p) => p.payment_id === payment.payment_id);
+      const payments = exists
+        ? prev.payments.map((p) => (p.payment_id === payment.payment_id ? payment : p))
+        : [...prev.payments, payment];
+      return { ...prev, payments };
+    });
+  }, []);
+
+  const handleNotificationChange = useCallback((notification: Notification, eventType: "INSERT" | "UPDATE") => {
+    setState((prev) => {
+      if (eventType === "INSERT") {
+        // Avoid duplicates — only add if not already in local state
+        const exists = prev.notifications.some((n) => n.id === notification.id);
+        if (exists) return prev;
+        return { ...prev, notifications: [notification, ...prev.notifications] };
+      } else {
+        // UPDATE — replace
+        return {
+          ...prev,
+          notifications: prev.notifications.map((n) =>
+            n.id === notification.id ? notification : n
+          ),
+        };
+      }
+    });
+  }, []);
+
+  // Activate realtime sync when user is authenticated
+  useRealtimeSync({
+    userId: state.currentUser?.id ?? null,
+    onLoanChange: handleLoanChange,
+    onPaymentChange: handlePaymentChange,
+    onNotificationChange: handleNotificationChange,
+  });
+
   return (
     <AppContext.Provider
       value={{
@@ -1091,6 +1192,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         acceptTerms,
         selectLoan,
         selectPayment,
+        refreshData,
         createLoan,
         acceptLoan,
         declineLoan,

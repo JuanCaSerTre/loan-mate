@@ -1,12 +1,6 @@
 /**
  * LoanMate — Push Notification Service
  * Manages browser push notifications via Firebase Cloud Messaging.
- * 
- * Features:
- * - Permission management
- * - FCM token registration
- * - Local browser notification display
- * - Notification event mapping for all loan/payment events
  */
 import { getToken, onMessage, type MessagePayload } from "firebase/messaging";
 import { getFirebaseMessaging, isFirebaseConfigured, VAPID_KEY } from "@/config/firebase";
@@ -47,6 +41,7 @@ class PushNotificationService {
   private _unsubscribeOnMessage: (() => void) | null = null;
   private _isInitialized = false;
   private _permissionStatus: PushPermissionStatus = "default";
+  private _swRegistration: ServiceWorkerRegistration | null = null;
 
   /**
    * Check if push notifications are supported in this browser
@@ -101,19 +96,16 @@ class PushNotificationService {
   async initialize(config?: PushNotificationConfig): Promise<boolean> {
     if (this._isInitialized) return true;
 
-    // Check browser support
     if (!this.isSupported()) {
       console.warn("[LoanMate Push] Push notifications not supported");
       return false;
     }
 
-    // Check permission
     if (Notification.permission !== "granted") {
       console.warn("[LoanMate Push] Permission not granted");
       return false;
     }
 
-    // Check Firebase config
     if (!isFirebaseConfigured()) {
       console.warn("[LoanMate Push] Firebase not configured — using local notifications only");
       this._isInitialized = true;
@@ -130,6 +122,12 @@ class PushNotificationService {
     try {
       // Register service worker
       const registration = await this._registerServiceWorker();
+      this._swRegistration = registration;
+
+      // Send Firebase config to service worker so it can handle background messages
+      if (registration) {
+        this._sendConfigToSW(registration);
+      }
 
       // Get FCM token
       if (VAPID_KEY && registration) {
@@ -139,7 +137,7 @@ class PushNotificationService {
             serviceWorkerRegistration: registration,
           });
           console.log("[LoanMate Push] FCM Token registered:", this._fcmToken?.slice(0, 20) + "...");
-          config?.onTokenRefresh?.(this._fcmToken);
+          config?.onTokenRefresh?.(this._fcmToken ?? "");
         } catch (tokenError) {
           console.warn("[LoanMate Push] FCM token error (continuing with local notifications):", tokenError);
         }
@@ -150,12 +148,11 @@ class PushNotificationService {
         console.log("[LoanMate Push] Foreground message:", payload);
         config?.onNotificationReceived?.(payload);
 
-        // Show local notification for foreground messages
         if (payload.notification) {
           this.showLocalNotification(
             payload.notification.title || "JUCA",
             payload.notification.body || "",
-            { data: payload.data }
+            { data: payload.data as Record<string, string | undefined> }
           );
         }
       });
@@ -164,7 +161,6 @@ class PushNotificationService {
       return true;
     } catch (error) {
       console.error("[LoanMate Push] Initialization failed:", error);
-      // Still mark as initialized for local notification fallback
       this._isInitialized = true;
       return true;
     }
@@ -188,7 +184,7 @@ class PushNotificationService {
     }
 
     try {
-      const registration = await navigator.serviceWorker.getRegistration();
+      const registration = this._swRegistration || await navigator.serviceWorker.getRegistration();
       if (registration) {
         await registration.showNotification(title, {
           body,
@@ -200,7 +196,6 @@ class PushNotificationService {
           vibrate: [200, 100, 200],
         });
       } else {
-        // Fallback to basic Notification API
         new Notification(title, {
           body,
           icon: options?.icon || "/vite.svg",
@@ -216,7 +211,6 @@ class PushNotificationService {
 
   /**
    * Send a push notification for an in-app notification event.
-   * This shows a local browser notification matching the in-app notification.
    */
   async sendForNotification(notification: LoanNotification): Promise<void> {
     const emoji = NOTIFICATION_ICONS[notification.type] || "🔔";
@@ -263,6 +257,43 @@ class PushNotificationService {
     } catch (error) {
       console.warn("[LoanMate Push] Service worker registration failed:", error);
       return null;
+    }
+  }
+
+  /**
+   * Send Firebase config to service worker for background message handling
+   */
+  private _sendConfigToSW(registration: ServiceWorkerRegistration): void {
+    try {
+      const config = {
+        apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
+        authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
+        projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
+        storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
+        messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+        appId: import.meta.env.VITE_FIREBASE_APP_ID || "",
+      };
+
+      if (!config.apiKey || !config.projectId) return;
+
+      const sw = registration.active || registration.installing || registration.waiting;
+      if (sw) {
+        sw.postMessage({ type: "FIREBASE_CONFIG", config });
+      } else {
+        // Wait for SW to activate
+        registration.addEventListener("updatefound", () => {
+          const newSW = registration.installing;
+          if (newSW) {
+            newSW.addEventListener("statechange", () => {
+              if (newSW.state === "activated") {
+                newSW.postMessage({ type: "FIREBASE_CONFIG", config });
+              }
+            });
+          }
+        });
+      }
+    } catch (err) {
+      console.warn("[LoanMate Push] Could not send config to SW:", err);
     }
   }
 }
