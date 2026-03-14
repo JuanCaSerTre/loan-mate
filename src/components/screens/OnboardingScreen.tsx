@@ -2,19 +2,25 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Camera, User as UserIcon } from "lucide-react";
 import { useApp } from "@/context/AppContext";
-import { User } from "@/types/loan";
 import { trackUserSignup } from "@/services/analyticsService";
+import { createUser } from "@/services/api/supabaseDataService";
 
 export default function OnboardingScreen() {
   const { login } = useApp();
   const [name, setName] = useState("");
+  const verifiedPhone = sessionStorage.getItem("loanmate_verified_phone") || "";
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!name.trim()) {
       setError("Please enter your full name");
       return;
     }
+
+    setIsLoading(true);
+    setError("");
+
     const initials = name
       .trim()
       .split(" ")
@@ -23,15 +29,23 @@ export default function OnboardingScreen() {
       .join("")
       .toUpperCase();
 
-    const newUser: User = {
-      id: "user_current",
+    // Save the user to Supabase
+    const savedUser = await createUser({
       name: name.trim(),
-      phone_number: "+1 (555) 234-5678",
+      phone_number: verifiedPhone,
       avatar: initials,
-      created_at: new Date().toISOString(),
-    };
-    trackUserSignup(newUser.id);
-    login(newUser);
+    });
+
+    setIsLoading(false);
+
+    if (!savedUser) {
+      setError("Failed to create profile. Please try again.");
+      return;
+    }
+
+    sessionStorage.removeItem("loanmate_verified_phone");
+    trackUserSignup(savedUser.id);
+    login(savedUser);
   };
 
   return (
@@ -119,7 +133,7 @@ export default function OnboardingScreen() {
             </label>
             <div className="flex items-center gap-3 h-14 px-4 rounded-2xl bg-gray-50 border border-gray-100">
               <span className="text-gray-500 text-base">
-                +1 (555) 234-5678
+                {verifiedPhone || "—"}
               </span>
               <span className="ml-auto text-xs text-emerald-600 font-semibold bg-emerald-50 px-2.5 py-1 rounded-full">
                 Verified ✓
@@ -137,9 +151,10 @@ export default function OnboardingScreen() {
         >
           <button
             onClick={handleCreate}
-            className="w-full h-14 rounded-2xl bg-[#1B2E4B] text-white font-semibold text-base active:scale-[0.98] transition-transform shadow-lg shadow-[#1B2E4B]/20"
+            disabled={isLoading}
+            className="w-full h-14 rounded-2xl bg-[#1B2E4B] text-white font-semibold text-base active:scale-[0.98] transition-transform shadow-lg shadow-[#1B2E4B]/20 disabled:opacity-60"
           >
-            Create My Profile
+            {isLoading ? "Creating Profile…" : "Create My Profile"}
           </button>
         </motion.div>
       </div>

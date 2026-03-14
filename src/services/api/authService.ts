@@ -1,10 +1,10 @@
 /**
  * LoanMate — Auth Service
- * Handles phone verification, OTP, session management.
- * Currently uses mock implementation; swap to Supabase Auth when connected.
+ * Handles phone verification via Twilio Verify (through Supabase Edge Functions).
  */
 import { User } from "@/types/loan";
-import { currentUser, mockUsers } from "@/data/mockData";
+import { supabase } from "@/lib/supabase";
+import { getUserByPhone } from "@/services/api/supabaseDataService";
 import type { ApiResponse } from "./client";
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -25,29 +25,55 @@ class AuthService {
   private session: AuthSession | null = null;
 
   /**
-   * Send OTP code to a phone number.
-   * TODO: Replace with Supabase Auth signInWithOtp()
+   * Send OTP via Twilio Verify through Supabase Edge Function.
+   * phoneNumber must be in E.164 format, e.g. +15551234567
    */
   async sendOTP(phoneNumber: string): Promise<ApiResponse<OTPResult>> {
-    // Simulate network delay
-    await this._delay(800);
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "supabase-functions-send-otp",
+        { body: { phoneNumber } }
+      );
 
-    // Mock: always succeeds
-    return {
-      data: { success: true, message: "OTP sent successfully" },
-      error: null,
-      status: 200,
-    };
+      // Network-level error (function unreachable, CORS, etc.)
+      if (error) {
+        console.error("[sendOTP] invoke error:", error);
+        return {
+          data: null,
+          error: { code: "SEND_OTP_ERROR", message: error.message || "Failed to reach server" },
+          status: 500,
+        };
+      }
+
+      // Application-level error (Twilio failure, missing config, etc.)
+      if (!data?.success) {
+        console.error("[sendOTP] server error:", data?.error);
+        return {
+          data: null,
+          error: { code: "SEND_OTP_ERROR", message: data?.error || "Failed to send OTP" },
+          status: 400,
+        };
+      }
+
+      return {
+        data: { success: true, message: "OTP sent successfully" },
+        error: null,
+        status: 200,
+      };
+    } catch (err: any) {
+      console.error("[sendOTP] exception:", err);
+      return {
+        data: null,
+        error: { code: "SEND_OTP_ERROR", message: err.message || "Network error" },
+        status: 500,
+      };
+    }
   }
 
   /**
-   * Verify OTP code.
-   * TODO: Replace with Supabase Auth verifyOtp()
+   * Verify OTP via Twilio Verify through Supabase Edge Function.
    */
   async verifyOTP(phoneNumber: string, otp: string): Promise<ApiResponse<AuthSession>> {
-    await this._delay(1000);
-
-    // Mock: accept any 6-digit code
     if (otp.length !== 6 || !/^\d{6}$/.test(otp)) {
       return {
         data: null,
@@ -56,31 +82,66 @@ class AuthService {
       };
     }
 
-    // Find user by phone or return null (new user flow)
-    const existingUser = mockUsers.find(
-      (u) => u.phone_number.replace(/\D/g, "").includes(phoneNumber.replace(/\D/g, ""))
-    );
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "supabase-functions-verify-otp",
+        { body: { phoneNumber, code: otp } }
+      );
 
-    const user = existingUser || null;
-    const session: AuthSession = {
-      user: user || currentUser,
-      accessToken: `mock_access_${Date.now()}`,
-      refreshToken: `mock_refresh_${Date.now()}`,
-      expiresAt: Date.now() + 3600 * 1000,
-    };
+      // Network-level error
+      if (error) {
+        console.error("[verifyOTP] invoke error:", error);
+        return {
+          data: null,
+          error: { code: "VERIFY_OTP_ERROR", message: error.message || "Failed to reach server" },
+          status: 500,
+        };
+      }
 
-    this.session = session;
+      // Application-level error or invalid code
+      if (!data?.valid) {
+        console.error("[verifyOTP] verification failed:", data?.error || data?.status);
+        return {
+          data: null,
+          error: { code: "INVALID_OTP", message: data?.error || "Incorrect or expired verification code" },
+          status: 400,
+        };
+      }
 
-    return {
-      data: session,
-      error: null,
-      status: 200,
-    };
+      // Look up the user in Supabase by phone number
+      const existingUser = await getUserByPhone(phoneNumber);
+
+      const session: AuthSession = {
+        user: existingUser ?? ({
+          id: "",
+          name: "",
+          phone_number: phoneNumber,
+          created_at: new Date().toISOString(),
+        } as User),
+        accessToken: `access_${Date.now()}`,
+        refreshToken: `refresh_${Date.now()}`,
+        expiresAt: Date.now() + 3600 * 1000,
+      };
+
+      this.session = session;
+
+      return {
+        data: session,
+        error: null,
+        status: 200,
+      };
+    } catch (err: any) {
+      console.error("[verifyOTP] exception:", err);
+      return {
+        data: null,
+        error: { code: "VERIFY_OTP_ERROR", message: err.message || "Network error" },
+        status: 500,
+      };
+    }
   }
 
   /**
    * Create user profile after first-time phone verification.
-   * TODO: Replace with Supabase insert into users table
    */
   async createProfile(name: string, phoneNumber: string, avatar?: string): Promise<ApiResponse<User>> {
     await this._delay(600);
@@ -116,7 +177,6 @@ class AuthService {
 
   /**
    * Log out.
-   * TODO: Replace with Supabase Auth signOut()
    */
   async logout(): Promise<void> {
     this.session = null;

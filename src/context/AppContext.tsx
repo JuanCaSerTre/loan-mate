@@ -1,11 +1,5 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { User, Loan, Payment, Notification } from "@/types/loan";
-import {
-  mockLoans,
-  mockPayments,
-  mockNotifications,
-  mockUsers,
-} from "@/data/mockData";
 import {
   calculateTotalAmount,
 } from "@/lib/calculations";
@@ -23,6 +17,7 @@ import {
   trackPaymentConfirmed,
   trackLoanCompleted,
 } from "@/services/analyticsService";
+import * as db from "@/services/api/supabaseDataService";
 
 type AppScreen =
   | "splash"
@@ -64,7 +59,7 @@ interface LoanComputedData {
 
 interface AppContextType extends AppState {
   navigate: (screen: AppScreen) => void;
-  login: (user: User) => void;
+  login: (user: User) => Promise<void>;
   logout: () => void;
   /** Accept terms & privacy policy — records timestamp and navigates to dashboard. */
   acceptTerms: () => void;
@@ -78,7 +73,7 @@ interface AppContextType extends AppState {
     paymentFrequency: Loan["payment_frequency"];
     startDate: string;
     dueDate: string;
-  }) => string | null;
+  }) => Promise<string | null>;
   acceptLoan: (loanId: string) => void;
   declineLoan: (loanId: string) => void;
   registerPayment: (params: {
@@ -86,7 +81,7 @@ interface AppContextType extends AppState {
     amount: number;
     paymentDate: string;
     note?: string;
-  }) => SecurityValidationResult | null;
+  }) => Promise<SecurityValidationResult | null>;
   confirmPayment: (paymentId: string) => void;
   rejectPayment: (paymentId: string) => void;
   addLoan: (loan: Loan) => void;
@@ -130,10 +125,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     currentScreen: "splash",
     currentUser: null,
     isAuthenticated: false,
-    loans: mockLoans,
-    payments: mockPayments,
-    notifications: mockNotifications,
-    users: mockUsers,
+    loans: [],
+    payments: [],
+    notifications: [],
+    users: [],
     selectedLoanId: null,
     selectedPaymentId: null,
     termsAcceptedAt: localStorage.getItem("loanmate_terms_accepted_at") ?? null,
@@ -143,7 +138,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setState((prev) => ({ ...prev, currentScreen: screen }));
   }, []);
 
-  const login = useCallback((user: User) => {
+  // Auto-restore session from localStorage on mount
+  useEffect(() => {
+    const storedUserId = localStorage.getItem("loanmate_user_id");
+    if (storedUserId) {
+      // Attempt to restore session by fetching user from Supabase
+      db.getUserById(storedUserId).then((user) => {
+        if (user) {
+          login(user);
+        } else {
+          // Stored user no longer exists — clear and show login
+          localStorage.removeItem("loanmate_user_id");
+          setState((prev) => ({ ...prev, currentScreen: "login" }));
+        }
+      }).catch(() => {
+        localStorage.removeItem("loanmate_user_id");
+        setState((prev) => ({ ...prev, currentScreen: "login" }));
+      });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const login = useCallback(async (user: User) => {
+    // Persist user ID for session restoration
+    localStorage.setItem("loanmate_user_id", user.id);
+
     // Issue auth token and configure API client
     const token = securityService.generateToken(user.id);
     apiClient.setTokenProvider(() => securityService.getTokenString());
@@ -156,6 +174,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // Determine whether the user still needs to see the terms screen
     const storedAcceptance = localStorage.getItem("loanmate_terms_accepted_at");
 
+    // Set authenticated state immediately so the UI responds
     setState((prev) => ({
       ...prev,
       currentUser: user,
@@ -163,6 +182,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       termsAcceptedAt: storedAcceptance,
       currentScreen: storedAcceptance ? "dashboard" : "terms",
     }));
+
+    // Load real data from Supabase (only if user has an actual id)
+    if (user.id) {
+      try {
+        const [loans, payments, notifications, allUsers] = await Promise.all([
+          db.getLoansForUser(user.id),
+          db.getPaymentsForUser(user.id),
+          db.getNotificationsForUser(user.id),
+          db.getAllUsers(),
+        ]);
+
+        // Ensure the current user is always in the users list
+        const userInList = allUsers.some((u) => u.id === user.id);
+        const finalUsers = userInList ? allUsers : [user, ...allUsers];
+
+        setState((prev) => ({
+          ...prev,
+          loans,
+          payments,
+          notifications,
+          users: finalUsers,
+        }));
+      } catch (err) {
+        console.error("[login] Failed to load data from Supabase:", err);
+      }
+    }
   }, []);
 
   const acceptTerms = useCallback(() => {
@@ -187,6 +232,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    // Clear session
+    localStorage.removeItem("loanmate_user_id");
+
     // Clear auth token and API client auth
     securityService.clearToken();
     apiClient.clearAuthToken();
@@ -244,7 +292,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Loan Creation Flow (with security) ─────────────────────────
   const createLoan = useCallback(
-    (params: {
+    async (params: {
       borrower: User;
       amount: number;
       interestRate: number;
@@ -252,7 +300,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       paymentFrequency: Loan["payment_frequency"];
       startDate: string;
       dueDate: string;
-    }): string | null => {
+    }): Promise<string | null> => {
       // We need to read current state synchronously for validation
       let currentState: AppState | null = null;
       setState((prev) => {
@@ -275,40 +323,74 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (!validation.allowed) {
-        // Return null to signal blocked — caller should check validateLoanCreation() first
         return null;
       }
 
       // Sanitize note-like fields
       const sanitizedAmount = securityService.sanitizeAmount(params.amount.toString());
-
-      const loanId = `loan_${Date.now()}`;
       const totalAmount = calculateTotalAmount(sanitizedAmount, params.interestRate);
+
+      // Persist to Supabase first to get the real UUID
+      const savedLoan = await db.createLoan({
+        lender_id: cs.currentUser.id,
+        borrower_id: params.borrower.id,
+        borrower_phone: params.borrower.phone_number,
+        loan_amount: sanitizedAmount,
+        interest_rate: params.interestRate,
+        total_amount: totalAmount,
+        number_of_payments: params.numberOfPayments,
+        payment_frequency: params.paymentFrequency,
+        start_date: params.startDate,
+        due_date: params.dueDate,
+        lender_name: cs.currentUser.name,
+        borrower_name: params.borrower.name,
+        lender_avatar: cs.currentUser.avatar,
+        borrower_avatar: params.borrower.avatar,
+      });
+
+      // Fallback to local-only if Supabase fails
+      const loanId = savedLoan?.loan_id ?? `loan_${Date.now()}`;
+      const newLoan: Loan = savedLoan ?? {
+        loan_id: loanId,
+        lender_id: cs.currentUser.id,
+        borrower_id: params.borrower.id,
+        borrower_phone: params.borrower.phone_number,
+        lender_name: cs.currentUser.name,
+        borrower_name: params.borrower.name,
+        lender_avatar: cs.currentUser.avatar,
+        borrower_avatar: params.borrower.avatar,
+        loan_amount: sanitizedAmount,
+        interest_rate: params.interestRate,
+        total_amount: totalAmount,
+        number_of_payments: params.numberOfPayments,
+        payment_frequency: params.paymentFrequency,
+        start_date: params.startDate,
+        due_date: params.dueDate,
+        status: "pending",
+        created_at: new Date().toISOString(),
+      };
+
+      // Save notifications to Supabase
+      await Promise.all([
+        db.createNotification({
+          user_id: cs.currentUser.id,
+          type: "loan_request_received",
+          title: "Loan Request Sent",
+          description: `You sent a loan request to ${params.borrower.name} for $${sanitizedAmount.toLocaleString()}`,
+          loan_id: loanId,
+        }),
+        db.createNotification({
+          user_id: params.borrower.id,
+          type: "loan_request_received",
+          title: "New Loan Request",
+          description: `${cs.currentUser.name} wants to lend you $${sanitizedAmount.toLocaleString()}`,
+          loan_id: loanId,
+        }),
+      ]);
 
       setState((prev) => {
         if (!prev.currentUser) return prev;
 
-        const newLoan: Loan = {
-          loan_id: loanId,
-          lender_id: prev.currentUser.id,
-          borrower_id: params.borrower.id,
-          borrower_phone: params.borrower.phone_number,
-          lender_name: prev.currentUser.name,
-          borrower_name: params.borrower.name,
-          lender_avatar: prev.currentUser.avatar,
-          borrower_avatar: params.borrower.avatar,
-          loan_amount: sanitizedAmount,
-          interest_rate: params.interestRate,
-          total_amount: totalAmount,
-          number_of_payments: params.numberOfPayments,
-          payment_frequency: params.paymentFrequency,
-          start_date: params.startDate,
-          due_date: params.dueDate,
-          status: "pending",
-          created_at: new Date().toISOString(),
-        };
-
-        // Notification for lender (confirmation)
         const lenderNotif: Notification = {
           id: `notif_${Date.now()}_lender`,
           type: "loan_request",
@@ -319,32 +401,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           created_at: new Date().toISOString(),
         };
 
-        // Notification for borrower (they receive the request)
         const borrowerNotif: Notification = {
           id: `notif_${Date.now()}_borrower`,
           type: "loan_request",
           title: "New Loan Request",
-          message: `${prev.currentUser.name} wants to lend you $${sanitizedAmount.toLocaleString()}`,
+          message: `${prev.currentUser!.name} wants to lend you $${sanitizedAmount.toLocaleString()}`,
           loan_id: loanId,
           read: false,
           created_at: new Date().toISOString(),
         };
 
-        // Log successful creation
         securityService.logEvent({
           type: "loan_created",
-          userId: prev.currentUser.id,
+          userId: prev.currentUser!.id,
           message: `Loan created: $${sanitizedAmount.toLocaleString()} to ${params.borrower.name}`,
           severity: "info",
-          metadata: {
-            loanId,
-            amount: sanitizedAmount,
-            borrowerId: params.borrower.id,
-            interestRate: params.interestRate,
-          },
+          metadata: { loanId, amount: sanitizedAmount, borrowerId: params.borrower.id, interestRate: params.interestRate },
         });
 
-        // Analytics
         trackLoanCreated({
           loanId,
           amount: sanitizedAmount,
@@ -407,6 +481,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
     });
     if (loanSnapshot) {
+      // Persist to Supabase
+      db.updateLoanStatus(loanId, "active");
+      db.createNotification({ user_id: loanSnapshot.borrower_id, type: "loan_accepted", title: "Loan Accepted", description: `You accepted the loan of $${loanSnapshot.loan_amount.toLocaleString()} from ${loanSnapshot.lender_name}`, loan_id: loanId });
+      db.createNotification({ user_id: loanSnapshot.lender_id, type: "loan_accepted", title: "Loan Accepted!", description: `${loanSnapshot.borrower_name} accepted your loan of $${loanSnapshot.loan_amount.toLocaleString()}.`, loan_id: loanId });
       trackLoanAccepted(loanId, loanSnapshot.loan_amount);
     }
   }, []);
@@ -449,69 +527,96 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
     });
     if (loanSnapshot) {
+      // Persist to Supabase
+      db.updateLoanStatus(loanId, "declined");
+      db.createNotification({ user_id: loanSnapshot.borrower_id, type: "loan_declined", title: "Loan Declined", description: `You declined the loan from ${loanSnapshot.lender_name}`, loan_id: loanId });
+      db.createNotification({ user_id: loanSnapshot.lender_id, type: "loan_declined", title: "Loan Declined", description: `${loanSnapshot.borrower_name} declined your loan of $${loanSnapshot.loan_amount.toLocaleString()}`, loan_id: loanId });
       trackLoanRejected(loanId, loanSnapshot.loan_amount);
     }
   }, []);
 
   // ─── Payment Registration (with security) ───────────────────────
   const registerPayment = useCallback(
-    (params: {
+    async (params: {
       loanId: string;
       amount: number;
       paymentDate: string;
       note?: string;
-    }): SecurityValidationResult | null => {
+    }): Promise<SecurityValidationResult | null> => {
       let result: SecurityValidationResult | null = null;
+      let currentState: AppState | null = null;
+
+      setState((prev) => {
+        currentState = prev;
+        return prev;
+      });
+
+      if (!currentState) return null;
+      const cs = currentState as AppState;
+      if (!cs.currentUser) return null;
+
+      const loan = cs.loans.find((l) => l.loan_id === params.loanId);
+      if (!loan || loan.status !== "active") return null;
+
+      const confirmedAmount = cs.payments
+        .filter((p) => p.loan_id === params.loanId && p.status === "confirmed")
+        .reduce((s, p) => s + p.amount, 0);
+      const remaining = loan.total_amount - confirmedAmount;
+
+      const validation = securityService.validatePaymentInput({
+        userId: cs.currentUser.id,
+        amount: params.amount,
+        remainingBalance: remaining,
+        existingPayments: cs.payments,
+      });
+
+      result = validation;
+
+      if (!validation.allowed) {
+        return result;
+      }
+
+      const clampedAmount = Math.min(
+        securityService.sanitizeAmount(params.amount.toString()),
+        remaining
+      );
+      const sanitizedNote = params.note
+        ? securityService.sanitizeTextInput(params.note)
+        : undefined;
+
+      // Persist to Supabase first to get real UUID
+      const savedPayment = await db.createPayment({
+        loan_id: params.loanId,
+        amount: clampedAmount,
+        created_by_user_id: cs.currentUser.id,
+        payment_date: params.paymentDate,
+        note: sanitizedNote,
+      });
+
+      const paymentId = savedPayment?.payment_id ?? `pay_${Date.now()}`;
+      const newPayment: Payment = savedPayment ?? {
+        payment_id: paymentId,
+        loan_id: params.loanId,
+        amount: clampedAmount,
+        created_by_user: cs.currentUser.id,
+        status: "pending_confirmation",
+        note: sanitizedNote,
+        created_at: new Date().toISOString(),
+        payment_date: params.paymentDate,
+      };
+
+      const isLender = loan.lender_id === cs.currentUser.id;
+      const counterpartyId = isLender ? loan.borrower_id : loan.lender_id;
+      const counterpartyName = isLender ? loan.borrower_name : loan.lender_name;
+
+      // Save notifications to Supabase
+      await Promise.all([
+        db.createNotification({ user_id: cs.currentUser.id, type: "payment_registered", title: "Payment Registered", description: `You registered a payment of $${clampedAmount.toLocaleString()} for ${counterpartyName} to confirm`, loan_id: params.loanId, payment_id: paymentId }),
+        db.createNotification({ user_id: counterpartyId, type: "payment_registered", title: "Payment Awaiting Confirmation", description: `${cs.currentUser.name} registered a payment of $${clampedAmount.toLocaleString()} — please confirm`, loan_id: params.loanId, payment_id: paymentId }),
+      ]);
 
       setState((prev) => {
         if (!prev.currentUser) return prev;
-        const loan = prev.loans.find((l) => l.loan_id === params.loanId);
-        if (!loan || loan.status !== "active") return prev;
-
-        // Calculate remaining to cap overpayment
-        const confirmedAmount = prev.payments
-          .filter((p) => p.loan_id === params.loanId && p.status === "confirmed")
-          .reduce((s, p) => s + p.amount, 0);
-        const remaining = loan.total_amount - confirmedAmount;
-
-        // Security validation
-        const validation = securityService.validatePaymentInput({
-          userId: prev.currentUser.id,
-          amount: params.amount,
-          remainingBalance: remaining,
-          existingPayments: prev.payments,
-        });
-
-        if (!validation.allowed) {
-          result = validation;
-          return prev; // Block the payment
-        }
-
-        result = validation;
-
-        const clampedAmount = Math.min(
-          securityService.sanitizeAmount(params.amount.toString()),
-          remaining
-        );
-
-        // Sanitize note
-        const sanitizedNote = params.note
-          ? securityService.sanitizeTextInput(params.note)
-          : undefined;
-
-        const newPayment: Payment = {
-          payment_id: `pay_${Date.now()}`,
-          loan_id: params.loanId,
-          amount: clampedAmount,
-          created_by_user: prev.currentUser.id,
-          status: "pending_confirmation",
-          note: sanitizedNote,
-          created_at: new Date().toISOString(),
-          payment_date: params.paymentDate,
-        };
-
-        const isLender = loan.lender_id === prev.currentUser.id;
-        const counterpartyName = isLender ? loan.borrower_name : loan.lender_name;
 
         const senderNotif: Notification = {
           id: `notif_${Date.now()}_pay_sender`,
@@ -519,7 +624,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           title: "Payment Registered",
           message: `You registered a payment of $${clampedAmount.toLocaleString()} for ${counterpartyName} to confirm`,
           loan_id: params.loanId,
-          payment_id: newPayment.payment_id,
+          payment_id: paymentId,
           read: false,
           created_at: new Date().toISOString(),
         };
@@ -528,28 +633,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           id: `notif_${Date.now()}_pay_receiver`,
           type: "payment_registered",
           title: "Payment Awaiting Confirmation",
-          message: `${prev.currentUser.name} registered a payment of $${clampedAmount.toLocaleString()} — please confirm`,
+          message: `${prev.currentUser!.name} registered a payment of $${clampedAmount.toLocaleString()} — please confirm`,
           loan_id: params.loanId,
-          payment_id: newPayment.payment_id,
+          payment_id: paymentId,
           read: false,
           created_at: new Date().toISOString(),
         };
 
-        // Log successful payment
         securityService.logEvent({
           type: "payment_registered",
-          userId: prev.currentUser.id,
+          userId: prev.currentUser!.id,
           message: `Payment registered: $${clampedAmount.toLocaleString()} for loan ${params.loanId}`,
           severity: "info",
-          metadata: { paymentId: newPayment.payment_id, amount: clampedAmount, loanId: params.loanId },
+          metadata: { paymentId, amount: clampedAmount, loanId: params.loanId },
         });
 
-        // Analytics
-        trackPaymentRegistered({
-          paymentId: newPayment.payment_id,
-          loanId: params.loanId,
-          amount: clampedAmount,
-        });
+        trackPaymentRegistered({ paymentId, loanId: params.loanId, amount: clampedAmount });
 
         return {
           ...prev,
@@ -681,6 +780,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (paymentSnapshot) {
+      // Persist to Supabase
+      db.updatePaymentStatus(paymentId, "confirmed");
+      db.createNotification({ user_id: paymentSnapshot.created_by_user, type: "payment_confirmed", title: "Payment Confirmed!", description: `Your payment of $${paymentSnapshot.amount.toLocaleString()} was confirmed`, loan_id: paymentSnapshot.loan_id, payment_id: paymentId });
       trackPaymentConfirmed({
         paymentId,
         loanId: paymentSnapshot.loan_id,
@@ -688,6 +790,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
     }
     if (wasCompleted && loanSnapshot) {
+      // Persist loan completion
+      db.updateLoanStatus(loanSnapshot.loan_id, "completed");
+      db.createNotification({ user_id: loanSnapshot.lender_id, type: "loan_accepted", title: "🎉 Loan Completed!", description: `The loan with ${loanSnapshot.borrower_name} has been fully repaid!`, loan_id: loanSnapshot.loan_id });
+      db.createNotification({ user_id: loanSnapshot.borrower_id, type: "loan_accepted", title: "🎉 Loan Completed!", description: `Your loan from ${loanSnapshot.lender_name} is fully repaid!`, loan_id: loanSnapshot.loan_id });
       trackLoanCompleted({
         loanId: loanSnapshot.loan_id,
         totalAmount: loanSnapshot.total_amount,
@@ -697,9 +803,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const rejectPayment = useCallback((paymentId: string) => {
+    let paymentSnapshot: Payment | undefined;
     setState((prev) => {
       const payment = prev.payments.find((p) => p.payment_id === paymentId);
       if (!payment || payment.status !== "pending_confirmation") return prev;
+      paymentSnapshot = payment;
 
       const updatedPayments = prev.payments.map((p) =>
         p.payment_id === paymentId ? { ...p, status: "rejected" as const } : p
@@ -733,10 +841,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         notifications: [registrantNotif, rejecterNotif, ...prev.notifications],
       };
     });
+    if (paymentSnapshot) {
+      // Persist to Supabase
+      db.updatePaymentStatus(paymentId, "rejected");
+      db.createNotification({ user_id: paymentSnapshot.created_by_user, type: "payment_rejected", title: "Payment Rejected", description: `Your payment of $${paymentSnapshot.amount.toLocaleString()} was rejected`, loan_id: paymentSnapshot.loan_id, payment_id: paymentId });
+    }
   }, []);
 
   // ─── Notifications ─────────────────────────────────────────────
   const markNotificationRead = useCallback((id: string) => {
+    db.markNotificationRead(id);
     setState((prev) => ({
       ...prev,
       notifications: prev.notifications.map((n) =>
@@ -746,10 +860,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const markAllNotificationsRead = useCallback(() => {
-    setState((prev) => ({
-      ...prev,
-      notifications: prev.notifications.map((n) => ({ ...n, read: true })),
-    }));
+    setState((prev) => {
+      if (prev.currentUser?.id) {
+        db.markAllNotificationsRead(prev.currentUser.id);
+      }
+      return {
+        ...prev,
+        notifications: prev.notifications.map((n) => ({ ...n, read: true })),
+      };
+    });
   }, []);
 
   const addNotification = useCallback((notification: Notification) => {

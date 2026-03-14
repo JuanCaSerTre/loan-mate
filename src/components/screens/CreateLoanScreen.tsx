@@ -107,7 +107,7 @@ export default function CreateLoanScreen() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!foundUser || !currentUser) return;
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
       toast.error("Invalid loan amount");
@@ -133,7 +133,7 @@ export default function CreateLoanScreen() {
       setSecurityWarnings(validation.warnings);
     }
 
-    const loanId = createLoan({
+    const loanId = await createLoan({
       borrower: foundUser,
       amount: parsedAmount,
       interestRate: parsedRate,

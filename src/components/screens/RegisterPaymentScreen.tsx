@@ -45,7 +45,7 @@ export default function RegisterPaymentScreen() {
     return true;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validateAmount(amount)) return;
 
     // Security validation
@@ -62,26 +62,26 @@ export default function RegisterPaymentScreen() {
 
     setSecurityError(null);
     setIsSubmitting(true);
-    setTimeout(() => {
-      const result = registerPayment({
-        loanId: loan.loan_id,
-        amount: parsedAmount,
-        paymentDate: date,
-        note: note || undefined,
-      });
 
-      if (result && !result.allowed) {
-        setIsSubmitting(false);
-        setSecurityError(result.reason || "Payment blocked.");
-        toast.error("Payment blocked", { description: result.reason });
-        return;
-      }
+    const result = await registerPayment({
+      loanId: loan.loan_id,
+      amount: parsedAmount,
+      paymentDate: date,
+      note: note || undefined,
+    });
 
-      toast.success("Payment submitted!", {
-        description: `$${parsedAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })} sent to ${counterparty} for confirmation`,
-      });
-      navigate("loan-details");
-    }, 500);
+    setIsSubmitting(false);
+
+    if (result && !result.allowed) {
+      setSecurityError(result.reason || "Payment blocked.");
+      toast.error("Payment blocked", { description: result.reason });
+      return;
+    }
+
+    toast.success("Payment submitted!", {
+      description: `$${parsedAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })} sent to ${counterparty} for confirmation`,
+    });
+    navigate("loan-details");
   };
 
   // Quick amount buttons
