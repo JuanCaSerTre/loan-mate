@@ -14,6 +14,12 @@ function dbUserToUser(row: {
   phone_number: string;
   avatar_url: string | null;
   created_at: string;
+  is_premium?: boolean | null;
+  stripe_customer_id?: string | null;
+  subscription_status?: string | null;
+  subscription_id?: string | null;
+  subscription_expiry?: string | null;
+  subscription_plan?: string | null;
 }): User {
   return {
     id: row.id,
@@ -21,6 +27,12 @@ function dbUserToUser(row: {
     phone_number: row.phone_number,
     avatar: row.avatar_url ?? undefined,
     created_at: row.created_at,
+    is_premium: row.is_premium ?? false,
+    stripe_customer_id: row.stripe_customer_id ?? undefined,
+    subscription_status: (row.subscription_status as User["subscription_status"]) ?? "free",
+    subscription_id: row.subscription_id ?? undefined,
+    subscription_expiry: row.subscription_expiry ?? undefined,
+    subscription_plan: (row.subscription_plan as User["subscription_plan"]) ?? undefined,
   };
 }
 

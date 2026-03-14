@@ -1,18 +1,28 @@
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Search, Check, BookUser, ChevronRight, Users, CalendarDays, TrendingUp, Wallet, Clock, ShieldAlert, ShieldCheck, AlertTriangle } from "lucide-react";
+import { X, Search, Check, BookUser, ChevronRight, Users, CalendarDays, TrendingUp, Wallet, Clock, ShieldAlert, ShieldCheck, AlertTriangle, Crown } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { PaymentFrequency } from "@/types/loan";
 import AvatarBadge from "@/components/shared/AvatarBadge";
 import { calculateTotalAmount, calculateDueDate, generatePaymentSchedule } from "@/lib/calculations";
 import { useContacts } from "@/hooks/useContacts";
+import { useSubscription } from "@/hooks/useSubscription";
+import UpgradePrompt from "@/components/shared/UpgradePrompt";
 import { LoanMateFriend } from "@/types/contact";
+import { SUBSCRIPTION } from "@/config/constants";
 import { toast } from "sonner";
 
 type Step = 1 | 2 | 3;
 
 export default function CreateLoanScreen() {
-  const { navigate, currentUser, findUserByPhone, createLoan, users, validateLoanCreation } = useApp();
+  const { navigate, currentUser, findUserByPhone, createLoan, users, loans, validateLoanCreation } = useApp();
+  const {
+    canCreateLoan,
+    hasReachedFreeLimit,
+    activeLoansCount,
+    startCheckout,
+    isCheckoutLoading,
+  } = useSubscription(currentUser, loans);
   const [step, setStep] = useState<Step>(1);
   const [borrowerPhone, setBorrowerPhone] = useState("");
   const [foundUser, setFoundUser] = useState<ReturnType<typeof findUserByPhone>>(undefined);
@@ -26,6 +36,7 @@ export default function CreateLoanScreen() {
   const [showSchedule, setShowSchedule] = useState(false);
   const [securityError, setSecurityError] = useState<string | null>(null);
   const [securityWarnings, setSecurityWarnings] = useState<string[]>([]);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
 
   // Contact syncing for the inline contact picker
   const {
@@ -109,6 +120,13 @@ export default function CreateLoanScreen() {
 
   const handleSubmit = async () => {
     if (!foundUser || !currentUser) return;
+
+    // Check free loan limit
+    if (!canCreateLoan) {
+      setShowUpgradePrompt(true);
+      return;
+    }
+
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
       toast.error("Invalid loan amount");
       return;
@@ -202,6 +220,21 @@ export default function CreateLoanScreen() {
           ))}
         </div>
       </div>
+
+      {/* Free limit warning */}
+      {hasReachedFreeLimit && (
+        <div className="mx-5 mb-2">
+          <button
+            onClick={() => setShowUpgradePrompt(true)}
+            className="w-full flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5 active:scale-[0.99] transition-transform"
+          >
+            <Crown className="w-4 h-4 text-amber-600 flex-shrink-0" />
+            <p className="text-amber-700 text-xs font-medium flex-1 text-left">
+              You've reached the free plan limit ({SUBSCRIPTION.FREE_LOAN_LIMIT} active loans). Upgrade to continue.
+            </p>
+          </button>
+        </div>
+      )}
 
       {/* Steps */}
       <div className="flex-1 overflow-y-auto px-5 pb-6 pt-4">
@@ -806,6 +839,18 @@ export default function CreateLoanScreen() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Free Limit Upgrade Prompt */}
+      <UpgradePrompt
+        isOpen={showUpgradePrompt}
+        onClose={() => setShowUpgradePrompt(false)}
+        onUpgrade={async (plan) => {
+          await startCheckout(plan);
+          setShowUpgradePrompt(false);
+        }}
+        isLoading={isCheckoutLoading}
+        activeLoansCount={activeLoansCount}
+      />
     </div>
   );
 }

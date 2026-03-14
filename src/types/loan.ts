@@ -2,12 +2,22 @@ export type PaymentFrequency = "weekly" | "biweekly" | "monthly";
 export type LoanStatus = "pending" | "active" | "completed" | "declined";
 export type PaymentStatus = "pending_confirmation" | "confirmed" | "rejected";
 
+export type SubscriptionStatus = "free" | "active" | "past_due" | "canceled" | "trialing";
+export type SubscriptionPlan = "monthly" | "yearly";
+
 export interface User {
   id: string;
   name: string;
   phone_number: string;
   avatar?: string;
   created_at: string;
+  // Subscription fields
+  is_premium?: boolean;
+  stripe_customer_id?: string;
+  subscription_status?: SubscriptionStatus;
+  subscription_id?: string;
+  subscription_expiry?: string;
+  subscription_plan?: SubscriptionPlan;
 }
 
 export interface Loan {

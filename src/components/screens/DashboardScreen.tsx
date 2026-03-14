@@ -1,12 +1,15 @@
 import { motion } from "framer-motion";
-import { Plus, AlertTriangle, ArrowUpRight, ArrowDownLeft, BookUser, Share2, Copy } from "lucide-react";
+import { Plus, AlertTriangle, ArrowUpRight, ArrowDownLeft, BookUser, Share2, Copy, Crown } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { useInvitations } from "@/hooks/useInvitations";
+import { useSubscription } from "@/hooks/useSubscription";
 import LoanCard from "@/components/shared/LoanCard";
 import AvatarBadge from "@/components/shared/AvatarBadge";
+import UpgradePrompt from "@/components/shared/UpgradePrompt";
 import { toast } from "sonner";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { trackComputedMetrics, trackDailyActiveUser } from "@/services/analyticsService";
+import { SUBSCRIPTION } from "@/config/constants";
 
 export default function DashboardScreen() {
   const {
@@ -21,6 +24,18 @@ export default function DashboardScreen() {
     getPendingLoanRequests,
     getPendingPaymentConfirmations,
   } = useApp();
+
+  const {
+    isPremium,
+    hasReachedFreeLimit,
+    canCreateLoan,
+    activeLoansCount,
+    remainingFreeLoans,
+    startCheckout,
+    isCheckoutLoading,
+  } = useSubscription(currentUser, loans);
+
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
 
   // Track computed metrics and DAU each time the dashboard is visited
   useEffect(() => {
@@ -203,6 +218,34 @@ export default function DashboardScreen() {
           </button>
         </motion.div>
 
+        {/* Free Plan Limit Banner */}
+        {!isPremium && activeLoansCount >= SUBSCRIPTION.FREE_LOAN_LIMIT - 1 && (
+          <motion.button
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.19 }}
+            onClick={() => setShowUpgradePrompt(true)}
+            className="w-full flex items-center gap-3 bg-gradient-to-r from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl px-4 py-3 active:scale-[0.98] transition-transform"
+          >
+            <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <Crown className="w-4 h-4 text-amber-600" />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-amber-800 text-sm font-semibold">
+                {hasReachedFreeLimit
+                  ? "Loan limit reached"
+                  : `${remainingFreeLoans} loan${remainingFreeLoans === 1 ? "" : "s"} remaining`}
+              </p>
+              <p className="text-amber-600/70 text-xs">
+                Upgrade to Premium for unlimited loans
+              </p>
+            </div>
+            <div className="px-2.5 py-1 rounded-full bg-amber-500 text-white text-[10px] font-bold">
+              PRO
+            </div>
+          </motion.button>
+        )}
+
         {/* Active Loans */}
         <div>
           <motion.div
@@ -251,11 +294,29 @@ export default function DashboardScreen() {
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ delay: 0.5, type: "spring", stiffness: 200 }}
-        onClick={() => navigate("create-loan")}
+        onClick={() => {
+          if (canCreateLoan) {
+            navigate("create-loan");
+          } else {
+            setShowUpgradePrompt(true);
+          }
+        }}
         className="absolute bottom-20 right-5 w-14 h-14 rounded-full bg-[#1B2E4B] shadow-lg shadow-[#1B2E4B]/30 flex items-center justify-center z-20 active:scale-95 transition-transform"
       >
         <Plus className="w-7 h-7 text-white" strokeWidth={2.5} />
       </motion.button>
+
+      {/* Upgrade Prompt */}
+      <UpgradePrompt
+        isOpen={showUpgradePrompt}
+        onClose={() => setShowUpgradePrompt(false)}
+        onUpgrade={async (plan) => {
+          await startCheckout(plan);
+          setShowUpgradePrompt(false);
+        }}
+        isLoading={isCheckoutLoading}
+        activeLoansCount={activeLoansCount}
+      />
     </div>
   );
 }

@@ -401,15 +401,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           created_at: new Date().toISOString(),
         };
 
-        const borrowerNotif: Notification = {
-          id: `notif_${Date.now()}_borrower`,
-          type: "loan_request",
-          title: "New Loan Request",
-          message: `${prev.currentUser!.name} wants to lend you $${sanitizedAmount.toLocaleString()}`,
-          loan_id: loanId,
-          read: false,
-          created_at: new Date().toISOString(),
-        };
+        // NOTE: borrowerNotif is saved to Supabase above and will be loaded
+        // when the borrower logs in. Do NOT add it to the lender's local state
+        // to avoid the lender receiving the borrower's push notification.
 
         securityService.logEvent({
           type: "loan_created",
@@ -430,7 +424,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return {
           ...prev,
           loans: [...prev.loans, newLoan],
-          notifications: [borrowerNotif, lenderNotif, ...prev.notifications],
+          notifications: [lenderNotif, ...prev.notifications],
           selectedLoanId: loanId,
         };
       });
@@ -474,10 +468,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         created_at: new Date().toISOString(),
       };
 
+      // Only add the current user's (borrower's) notification to local state.
+      // lenderNotif is saved to Supabase and will appear when the lender loads their data.
       return {
         ...prev,
         loans: updatedLoans,
-        notifications: [lenderNotif, borrowerNotif, ...prev.notifications],
+        notifications: [borrowerNotif, ...prev.notifications],
       };
     });
     if (loanSnapshot) {
@@ -520,10 +516,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         created_at: new Date().toISOString(),
       };
 
+      // Only add the current user's (borrower's) notification to local state.
+      // lenderNotif is saved to Supabase and will appear when the lender loads their data.
       return {
         ...prev,
         loans: updatedLoans,
-        notifications: [lenderNotif, borrowerNotif, ...prev.notifications],
+        notifications: [borrowerNotif, ...prev.notifications],
       };
     });
     if (loanSnapshot) {
@@ -650,10 +648,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
         trackPaymentRegistered({ paymentId, loanId: params.loanId, amount: clampedAmount });
 
+        // Only add the current user's (lender's/sender's) notification to local state.
+        // receiverNotif is saved to Supabase and will appear when the borrower loads their data.
         return {
           ...prev,
           payments: [...prev.payments, newPayment],
-          notifications: [receiverNotif, senderNotif, ...prev.notifications],
+          notifications: [senderNotif, ...prev.notifications],
         };
       });
 
@@ -766,13 +766,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const updatedLoan = updatedLoans.find((l) => l.loan_id === payment.loan_id);
       wasCompleted = updatedLoan?.status === "completed" && loan.status !== "completed";
 
+      // Only add the current user's (borrower's/confirmer's) notification to local state.
+      // registrantNotif is saved to Supabase and will appear when the lender loads their data.
       return {
         ...prev,
         payments: updatedPayments,
         loans: updatedLoans,
         notifications: [
           ...completionNotifs,
-          registrantNotif,
           confirmerNotif,
           ...prev.notifications,
         ],
@@ -835,10 +836,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         created_at: new Date().toISOString(),
       };
 
+      // Only add the current user's (borrower's/rejecter's) notification to local state.
+      // registrantNotif is saved to Supabase and will appear when the lender loads their data.
       return {
         ...prev,
         payments: updatedPayments,
-        notifications: [registrantNotif, rejecterNotif, ...prev.notifications],
+        notifications: [rejecterNotif, ...prev.notifications],
       };
     });
     if (paymentSnapshot) {

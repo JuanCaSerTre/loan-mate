@@ -194,24 +194,42 @@ export type Database = {
           avatar_url: string | null
           created_at: string | null
           id: string
+          is_premium: boolean | null
           name: string
           phone_number: string
+          stripe_customer_id: string | null
+          subscription_expiry: string | null
+          subscription_id: string | null
+          subscription_plan: string | null
+          subscription_status: string | null
           updated_at: string | null
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string | null
           id?: string
+          is_premium?: boolean | null
           name: string
           phone_number: string
+          stripe_customer_id?: string | null
+          subscription_expiry?: string | null
+          subscription_id?: string | null
+          subscription_plan?: string | null
+          subscription_status?: string | null
           updated_at?: string | null
         }
         Update: {
           avatar_url?: string | null
           created_at?: string | null
           id?: string
+          is_premium?: boolean | null
           name?: string
           phone_number?: string
+          stripe_customer_id?: string | null
+          subscription_expiry?: string | null
+          subscription_id?: string | null
+          subscription_plan?: string | null
+          subscription_status?: string | null
           updated_at?: string | null
         }
         Relationships: []

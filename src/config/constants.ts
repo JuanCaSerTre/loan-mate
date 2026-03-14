@@ -120,3 +120,31 @@ export const API = {
 export const SPLASH = {
   AUTO_TRANSITION_MS: 2000,
 } as const;
+
+// ─── Subscription / Premium ──────────────────────────────────────
+export const SUBSCRIPTION = {
+  /** Max active loans for free users */
+  FREE_LOAN_LIMIT: 3,
+  /** Monthly price in USD */
+  MONTHLY_PRICE: 3.99,
+  /** Yearly price in USD */
+  YEARLY_PRICE: 29.99,
+  /** Savings percentage for yearly vs monthly */
+  YEARLY_SAVINGS_PERCENT: Math.round(
+    ((3.99 * 12 - 29.99) / (3.99 * 12)) * 100
+  ),
+  FEATURES: {
+    FREE: [
+      "Up to 3 active loans",
+      "Basic payment tracking",
+      "Push notifications",
+    ],
+    PREMIUM: [
+      "Unlimited active loans",
+      "Advanced payment reminders",
+      "Loan export reports",
+      "Priority support",
+      "Custom payment schedules",
+    ],
+  },
+} as const;

@@ -3,8 +3,11 @@ import { LogOut, ChevronRight, Shield, HelpCircle, BellOff, BellRing, Loader2, S
 import { useApp } from "@/context/AppContext";
 import { usePushContext } from "@/context/PushNotificationContext";
 import { useInvitations } from "@/hooks/useInvitations";
+import { useSubscription } from "@/hooks/useSubscription";
 import AvatarBadge from "@/components/shared/AvatarBadge";
 import InviteMetricsCard from "@/components/shared/InviteMetricsCard";
+import SubscriptionCard from "@/components/shared/SubscriptionCard";
+import UpgradePrompt from "@/components/shared/UpgradePrompt";
 import { toast } from "sonner";
 import { useState } from "react";
 import { securityService } from "@/services/securityService";
@@ -16,7 +19,17 @@ export default function ProfileScreen() {
     currentUser?.id || "",
     currentUser?.name || ""
   );
+  const {
+    isPremium,
+    subscription,
+    isLoading: subLoading,
+    activeLoansCount,
+    startCheckout,
+    openBillingPortal,
+    isCheckoutLoading,
+  } = useSubscription(currentUser, loans);
   const [showSecurityLog, setShowSecurityLog] = useState(false);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
 
   if (!currentUser) return null;
 
@@ -111,6 +124,22 @@ export default function ProfileScreen() {
               </p>
             </div>
           ))}
+        </motion.div>
+
+        {/* Subscription Status */}
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.07 }}
+        >
+          <SubscriptionCard
+            isPremium={isPremium}
+            subscription={subscription}
+            isLoading={subLoading}
+            activeLoansCount={activeLoansCount}
+            onUpgrade={() => setShowUpgradePrompt(true)}
+            onManage={() => openBillingPortal()}
+          />
         </motion.div>
 
         {/* Account info */}
@@ -536,6 +565,18 @@ export default function ProfileScreen() {
           </span>
         </motion.button>
       </div>
+
+      {/* Upgrade Prompt Modal */}
+      <UpgradePrompt
+        isOpen={showUpgradePrompt}
+        onClose={() => setShowUpgradePrompt(false)}
+        onUpgrade={async (plan) => {
+          await startCheckout(plan);
+          setShowUpgradePrompt(false);
+        }}
+        isLoading={isCheckoutLoading}
+        activeLoansCount={activeLoansCount}
+      />
     </div>
   );
 }
